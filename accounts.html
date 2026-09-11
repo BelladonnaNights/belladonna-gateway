@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Belladonna Account</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Josefin+Sans:wght@200;300;400;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600;700&display=swap');
   *{margin:0;padding:0;box-sizing:border-box;}
   :root{
     --bg:#000000;--surface:#0d0d0d;--surface2:#141414;
@@ -14,36 +14,39 @@
     --text:#f0ece0;--text2:#b0a890;--text3:#8a8272;--text4:#4a4638;
     --danger:#b0505a;--success:#3a9a5a;
   }
-  body{background:var(--bg);color:var(--text);font-family:'Josefin Sans',sans-serif;font-weight:300;min-height:100vh;letter-spacing:0.03em;display:flex;align-items:center;justify-content:center;padding:1.5rem;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-weight:400;min-height:100vh;letter-spacing:0.01em;display:flex;align-items:center;justify-content:center;padding:1.5rem;}
   .wrap{width:100%;max-width:420px;}
-  .brand{font-family:'Cinzel',serif;font-size:2rem;font-weight:700;color:var(--gold);letter-spacing:0.14em;text-transform:uppercase;text-align:center;}
-  .sub{font-size:0.62rem;letter-spacing:0.4em;text-transform:uppercase;color:var(--text3);margin-top:0.4rem;margin-bottom:2rem;text-align:center;}
-  .card{background:var(--surface);border:1px solid var(--border);padding:1.75rem 1.5rem;}
-  .toggle-row{display:flex;border:1px solid var(--border);margin-bottom:1.5rem;}
-  .toggle-btn{flex:1;background:none;border:none;color:var(--text3);padding:0.7rem;font-family:'Josefin Sans',sans-serif;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;}
-  .toggle-btn.active{background:var(--gold-dim);color:var(--gold);}
+  .logo-img{display:block;margin:0 auto 0.9rem;width:64px;height:64px;object-fit:contain;}
+  .brand{font-family:'Bebas Neue',sans-serif;font-size:2.4rem;font-weight:400;color:var(--text);letter-spacing:0.08em;text-transform:uppercase;text-align:center;line-height:1;}
+  .brand .accent{color:var(--gold);}
+  .sub{font-family:'EB Garamond',serif;font-style:italic;font-size:0.95rem;color:var(--text3);margin-top:0.5rem;margin-bottom:2rem;text-align:center;letter-spacing:0.01em;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.75rem 1.5rem;}
+  .toggle-row{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:999px;margin-bottom:1.5rem;padding:4px;gap:4px;}
+  .toggle-btn{flex:1;background:none;border:none;border-radius:999px;color:var(--text3);padding:0.6rem;font-family:'DM Sans',sans-serif;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;font-weight:500;}
+  .toggle-btn.active{background:var(--gold-dim);color:var(--gold);border:1px solid var(--border-gold);}
   .field{margin-bottom:1rem;}
-  .field label{display:block;font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:0.4rem;}
-  .field input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:0.65rem 0.8rem;font-size:0.85rem;font-family:'Josefin Sans',sans-serif;outline:none;transition:border-color 0.2s;}
+  .field label{display:block;font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:0.4rem;font-family:'DM Sans',sans-serif;font-weight:500;}
+  .field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.65rem 0.8rem;font-size:0.85rem;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.2s;}
   .field input:focus{border-color:var(--gold);}
-  .field-hint{font-size:0.65rem;color:var(--text4);margin-top:0.35rem;line-height:1.5;}
-  .btn{width:100%;background:var(--gold-dim);border:1px solid var(--border-gold);color:var(--gold);padding:0.8rem;font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;cursor:pointer;font-family:'Josefin Sans',sans-serif;transition:all 0.2s;margin-top:0.4rem;}
+  .field-hint{font-size:0.68rem;color:var(--text4);margin-top:0.35rem;line-height:1.5;}
+  .btn{width:100%;background:var(--gold-dim);border:1px solid var(--border-gold);border-radius:999px;color:var(--gold);padding:0.8rem;font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;transition:all 0.2s;margin-top:0.4rem;}
   .btn:hover{background:rgba(201,169,110,0.2);}
   .btn:disabled{opacity:0.5;cursor:not-allowed;}
-  .msg{font-size:0.75rem;padding:0.7rem 0.9rem;margin-bottom:1rem;display:none;line-height:1.5;border-left:3px solid;}
+  .msg{font-size:0.75rem;padding:0.7rem 0.9rem;margin-bottom:1rem;display:none;line-height:1.5;border-left:3px solid;border-radius:0 6px 6px 0;}
   .msg.error{display:block;background:rgba(176,80,90,0.08);border-color:var(--danger);color:var(--danger);}
   .msg.success{display:block;background:rgba(58,154,90,0.08);border-color:var(--success);color:var(--success);}
   .panel{display:none;}
   .panel.active{display:block;}
-  .forgot-link{display:block;text-align:center;margin-top:1rem;font-size:0.68rem;letter-spacing:0.08em;color:var(--text3);text-decoration:none;cursor:pointer;}
+  .forgot-link{display:block;text-align:center;margin-top:1rem;font-size:0.7rem;letter-spacing:0.03em;color:var(--text3);text-decoration:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .forgot-link:hover{color:var(--gold);}
-  .footer-note{text-align:center;font-size:0.62rem;letter-spacing:0.1em;color:var(--text4);margin-top:1.75rem;text-transform:uppercase;line-height:1.8;}
+  .footer-note{text-align:center;font-size:0.62rem;letter-spacing:0.16em;color:var(--text4);margin-top:1.75rem;text-transform:uppercase;line-height:1.8;font-family:'DM Sans',sans-serif;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="brand">Belladonna</div>
-  <div class="sub">One Account · Every App</div>
+  <img src="logo.png" alt="Belladonna" class="logo-img" onerror="this.style.display='none'">
+  <div class="brand">BELLADONNA <span class="accent">ACCOUNT</span></div>
+  <div class="sub">One account, every app</div>
 
   <div class="card">
     <div class="toggle-row">
