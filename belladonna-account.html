@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Belladonna Account</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Josefin+Sans:wght@200;300;400;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --bg:#000000;--surface:#0d0d0d;--surface2:#141414;
+    --border:rgba(180,150,100,0.16);--border2:rgba(180,150,100,0.34);--border-gold:rgba(201,169,110,0.4);
+    --gold:#c9a96e;--gold2:#e0bc7e;--gold-dim:rgba(201,169,110,0.1);
+    --text:#f0ece0;--text2:#b0a890;--text3:#8a8272;--text4:#4a4638;
+    --danger:#b0505a;--success:#3a9a5a;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Josefin Sans',sans-serif;font-weight:300;min-height:100vh;letter-spacing:0.03em;display:flex;align-items:center;justify-content:center;padding:1.5rem;}
+  .wrap{width:100%;max-width:420px;}
+  .brand{font-family:'Cinzel',serif;font-size:2rem;font-weight:700;color:var(--gold);letter-spacing:0.14em;text-transform:uppercase;text-align:center;}
+  .sub{font-size:0.62rem;letter-spacing:0.4em;text-transform:uppercase;color:var(--text3);margin-top:0.4rem;margin-bottom:2rem;text-align:center;}
+  .card{background:var(--surface);border:1px solid var(--border);padding:1.75rem 1.5rem;}
+  .toggle-row{display:flex;border:1px solid var(--border);margin-bottom:1.5rem;}
+  .toggle-btn{flex:1;background:none;border:none;color:var(--text3);padding:0.7rem;font-family:'Josefin Sans',sans-serif;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;}
+  .toggle-btn.active{background:var(--gold-dim);color:var(--gold);}
+  .field{margin-bottom:1rem;}
+  .field label{display:block;font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:0.4rem;}
+  .field input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:0.65rem 0.8rem;font-size:0.85rem;font-family:'Josefin Sans',sans-serif;outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--gold);}
+  .field-hint{font-size:0.65rem;color:var(--text4);margin-top:0.35rem;line-height:1.5;}
+  .btn{width:100%;background:var(--gold-dim);border:1px solid var(--border-gold);color:var(--gold);padding:0.8rem;font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;cursor:pointer;font-family:'Josefin Sans',sans-serif;transition:all 0.2s;margin-top:0.4rem;}
+  .btn:hover{background:rgba(201,169,110,0.2);}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .msg{font-size:0.75rem;padding:0.7rem 0.9rem;margin-bottom:1rem;display:none;line-height:1.5;border-left:3px solid;}
+  .msg.error{display:block;background:rgba(176,80,90,0.08);border-color:var(--danger);color:var(--danger);}
+  .msg.success{display:block;background:rgba(58,154,90,0.08);border-color:var(--success);color:var(--success);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .forgot-link{display:block;text-align:center;margin-top:1rem;font-size:0.68rem;letter-spacing:0.08em;color:var(--text3);text-decoration:none;cursor:pointer;}
+  .forgot-link:hover{color:var(--gold);}
+  .footer-note{text-align:center;font-size:0.62rem;letter-spacing:0.1em;color:var(--text4);margin-top:1.75rem;text-transform:uppercase;line-height:1.8;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">Belladonna</div>
+  <div class="sub">One Account · Every App</div>
+
+  <div class="card">
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="tabSignin" onclick="switchTab('signin')">Sign In</button>
+      <button class="toggle-btn" id="tabSignup" onclick="switchTab('signup')">Create Account</button>
+    </div>
+
+    <div class="msg" id="msgBox"></div>
+
+    <!-- SIGN IN -->
+    <div class="panel active" id="panelSignin">
+      <div class="field">
+        <label>Email, Username, or Host ID</label>
+        <input type="text" id="signinIdentifier" placeholder="you@email.com, yourname, or BD-014" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="signinPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn" id="signinBtn" onclick="doSignIn()">Sign In</button>
+      <a class="forgot-link" onclick="showForgot()">Forgot password?</a>
+    </div>
+
+    <!-- FORGOT PASSWORD -->
+    <div class="panel" id="panelForgot">
+      <div class="field">
+        <label>Email, Username, or Host ID</label>
+        <input type="text" id="forgotIdentifier" placeholder="you@email.com, yourname, or BD-014">
+      </div>
+      <button class="btn" id="forgotBtn" onclick="doForgotPassword()">Send Reset Link</button>
+      <a class="forgot-link" onclick="switchTab('signin')">← Back to sign in</a>
+    </div>
+
+    <!-- CREATE ACCOUNT -->
+    <div class="panel" id="panelSignup">
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="signupName" placeholder="Your name">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="signupEmail" placeholder="you@email.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Username <span style="color:var(--text4);">(optional)</span></label>
+        <input type="text" id="signupUsername" placeholder="Choose a username" autocomplete="username">
+        <div class="field-hint">Lets you sign in without typing your email every time.</div>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="signupPassword" placeholder="At least 6 characters" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>Confirm Password</label>
+        <input type="password" id="signupConfirm" placeholder="Repeat password" autocomplete="new-password">
+      </div>
+      <button class="btn" id="signupBtn" onclick="doSignUp()">Create Account</button>
+      <div class="field-hint" style="text-align:center;margin-top:1rem;">This account works across every Belladonna app. Access to each one depends on what you've subscribed to.</div>
+    </div>
+  </div>
+
+  <div class="footer-note">Belladonna Nights</div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import {
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    sendPasswordResetEmail, signOut
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCIfAE1JGHsUGzzVH2pz1Vyj5b5OhA0tDQ",
+    authDomain: "belladonna-hq.firebaseapp.com",
+    projectId: "belladonna-hq",
+    storageBucket: "belladonna-hq.firebasestorage.app",
+    messagingSenderId: "1021873183587",
+    appId: "1:1021873183587:web:def283bb7b5ca48e4f9156"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  const params = new URLSearchParams(window.location.search);
+  const returnUrl = params.get("return"); // e.g. where to send them after success
+  const fromApp = params.get("app");      // e.g. "bingo" — which app sent them here
+
+  function showMsg(text, type) {
+    const box = document.getElementById("msgBox");
+    box.textContent = text;
+    box.className = "msg " + type;
+  }
+  function clearMsg() {
+    const box = document.getElementById("msgBox");
+    box.className = "msg";
+    box.textContent = "";
+  }
+
+  window.switchTab = function(which) {
+    clearMsg();
+    document.getElementById("panelSignin").classList.toggle("active", which === "signin");
+    document.getElementById("panelSignup").classList.toggle("active", which === "signup");
+    document.getElementById("panelForgot").classList.remove("active");
+    document.getElementById("tabSignin").classList.toggle("active", which === "signin");
+    document.getElementById("tabSignup").classList.toggle("active", which === "signup");
+  };
+
+  window.showForgot = function() {
+    clearMsg();
+    document.getElementById("panelSignin").classList.remove("active");
+    document.getElementById("panelSignup").classList.remove("active");
+    document.getElementById("panelForgot").classList.add("active");
+  };
+
+  // Resolve a typed identifier (email / username / host ID) down to a real email.
+  async function resolveToEmail(identifier) {
+    const val = identifier.trim();
+    if (val.includes("@")) return val; // typed an email directly
+
+    // Otherwise check the public lookup table (username or host ID -> email)
+    const lookupSnap = await getDoc(doc(db, "loginLookup", val.toLowerCase()));
+    if (lookupSnap.exists()) return lookupSnap.data().email;
+    return null;
+  }
+
+  // ── Sign in ──────────────────────────────────────────────────────────────
+  window.doSignIn = async function() {
+    clearMsg();
+    const identifier = document.getElementById("signinIdentifier").value.trim();
+    const password = document.getElementById("signinPassword").value;
+    const btn = document.getElementById("signinBtn");
+
+    if (!identifier || !password) { showMsg("Enter your login and password.", "error"); return; }
+
+    btn.disabled = true; btn.textContent = "Signing in…";
+    try {
+      const email = await resolveToEmail(identifier);
+      if (!email) { showMsg("We couldn't find an account matching that.", "error"); btn.disabled = false; btn.textContent = "Sign In"; return; }
+
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+
+      // Check ban status before letting them proceed anywhere
+      const profileSnap = await getDoc(doc(db, "users", cred.user.uid));
+      const profile = profileSnap.exists() ? profileSnap.data() : {};
+      const now = Date.now();
+      const banUntilMs = profile.banUntil ? profile.banUntil.toMillis?.() ?? profile.banUntil : null;
+      const isBanned = profile.status === "banned" && (banUntilMs === null || banUntilMs === undefined || banUntilMs > now);
+
+      if (isBanned) {
+        await signOut(auth);
+        showMsg("This account is currently restricted. Contact Belladonna if you believe this is an error.", "error");
+        btn.disabled = false; btn.textContent = "Sign In";
+        return;
+      }
+
+      showMsg("Signed in — redirecting…", "success");
+      setTimeout(() => {
+        window.location.href = returnUrl || "https://belladonnanights.github.io/belladonna-hq/";
+      }, 700);
+    } catch (e) {
+      showMsg("Incorrect login or password.", "error");
+      btn.disabled = false; btn.textContent = "Sign In";
+    }
+  };
+
+  // ── Forgot password ──────────────────────────────────────────────────────
+  window.doForgotPassword = async function() {
+    clearMsg();
+    const identifier = document.getElementById("forgotIdentifier").value.trim();
+    const btn = document.getElementById("forgotBtn");
+    if (!identifier) { showMsg("Enter your email, username, or Host ID.", "error"); return; }
+
+    btn.disabled = true; btn.textContent = "Sending…";
+    try {
+      const email = await resolveToEmail(identifier);
+      if (!email) { showMsg("We couldn't find an account matching that.", "error"); btn.disabled = false; btn.textContent = "Send Reset Link"; return; }
+      await sendPasswordResetEmail(auth, email);
+      showMsg("Check your email for a password reset link.", "success");
+    } catch (e) {
+      showMsg("Something went wrong. Please try again.", "error");
+    }
+    btn.disabled = false; btn.textContent = "Send Reset Link";
+  };
+
+  // ── Create account ───────────────────────────────────────────────────────
+  window.doSignUp = async function() {
+    clearMsg();
+    const name = document.getElementById("signupName").value.trim();
+    const email = document.getElementById("signupEmail").value.trim();
+    const username = document.getElementById("signupUsername").value.trim();
+    const password = document.getElementById("signupPassword").value;
+    const confirm = document.getElementById("signupConfirm").value;
+    const btn = document.getElementById("signupBtn");
+
+    if (!name || !email || !password) { showMsg("Name, email, and password are required.", "error"); return; }
+    if (password.length < 6) { showMsg("Password must be at least 6 characters.", "error"); return; }
+    if (password !== confirm) { showMsg("Passwords don't match.", "error"); return; }
+
+    btn.disabled = true; btn.textContent = "Creating account…";
+
+    try {
+      // If a username was chosen, make sure it isn't already taken
+      let usernameKey = null;
+      if (username) {
+        usernameKey = username.toLowerCase();
+        const existing = await getDoc(doc(db, "loginLookup", usernameKey));
+        if (existing.exists()) {
+          showMsg("That username is already taken — try another.", "error");
+          btn.disabled = false; btn.textContent = "Create Account";
+          return;
+        }
+      }
+
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = cred.user.uid;
+
+      // Default shape: a self-signed-up subscriber, no access yet.
+      // Hosts are created separately by an admin, not through this form.
+      await setDoc(doc(db, "users", uid), {
+        name,
+        email,
+        username: username || null,
+        hostId: null,
+        accountType: "subscriber",
+        status: "active",
+        banUntil: null,
+        entitlements: { bingo: false, trivia: false, mediaPlayer: false, training: false },
+        createdAt: new Date().toISOString(),
+        signedUpFrom: fromApp || null
+      });
+
+      if (usernameKey) {
+        await setDoc(doc(db, "loginLookup", usernameKey), { email });
+      }
+
+      showMsg("Account created! Redirecting…", "success");
+      setTimeout(() => {
+        window.location.href = returnUrl || "https://belladonnanights.github.io/belladonna-hq/";
+      }, 900);
+    } catch (e) {
+      if (e.code === "auth/email-already-in-use") {
+        showMsg("That email already has an account — try signing in instead.", "error");
+      } else {
+        showMsg("Something went wrong creating your account. Please try again.", "error");
+      }
+      btn.disabled = false; btn.textContent = "Create Account";
+    }
+  };
+</script>
+</body>
+</html>
