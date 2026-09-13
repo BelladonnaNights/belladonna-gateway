@@ -120,10 +120,14 @@
   import {
     getFirestore, doc, getDoc, setDoc
   } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import {
+    getDatabase, ref, set as rtdbSet
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCIfAE1JGHsUGzzVH2pz1Vyj5b5OhA0tDQ",
     authDomain: "belladonna-hq.firebaseapp.com",
+    databaseURL: "https://belladonna-hq-default-rtdb.firebaseio.com",
     projectId: "belladonna-hq",
     storageBucket: "belladonna-hq.firebasestorage.app",
     messagingSenderId: "1021873183587",
@@ -133,6 +137,22 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
+  const rtdb = getDatabase(app);
+
+  // Realtime Database's security rules can't see Firestore at all — they can only
+  // check other Realtime Database data. So every account's app access has to be
+  // written to BOTH places to actually work: Firestore (`entitlements`) is what
+  // the apps' own UI reads to decide what to show; Realtime Database
+  // (`programAccess`) is what the RTDB security *rules* check when a write is
+  // attempted. Keep these two in sync whenever either one changes.
+  function mirrorProgramAccess(uid, entitlements) {
+    return rtdbSet(ref(rtdb, 'users/' + uid + '/programAccess'), {
+      bingo: !!entitlements.bingo,
+      trivia: !!entitlements.trivia,
+      mediaPlayer: !!entitlements.mediaPlayer,
+      training: !!entitlements.training
+    }).catch(e => console.warn('Could not mirror programAccess to Realtime Database:', e));
+  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   const params = new URLSearchParams(window.location.search);
@@ -270,6 +290,7 @@
 
       // Default shape: a self-signed-up subscriber, no access yet.
       // Hosts are created separately by an admin, not through this form.
+      const entitlements = { bingo: false, trivia: false, mediaPlayer: false, training: false };
       await setDoc(doc(db, "users", uid), {
         name,
         email,
@@ -278,10 +299,11 @@
         accountType: "subscriber",
         status: "active",
         banUntil: null,
-        entitlements: { bingo: false, trivia: false, mediaPlayer: false, training: false },
+        entitlements,
         createdAt: new Date().toISOString(),
         signedUpFrom: fromApp || null
       });
+      await mirrorProgramAccess(uid, entitlements);
 
       if (usernameKey) {
         await setDoc(doc(db, "loginLookup", usernameKey), { email });
