@@ -80,6 +80,22 @@
       <a class="forgot-link" onclick="switchTab('signin')">← Back to sign in</a>
     </div>
 
+    <!-- CONTINUE AS (already signed in on this browser, sent here for a specific app) -->
+    <div class="panel" id="panelContinue">
+      <div style="text-align:center;padding:0.75rem 0 1.25rem;">
+        <div style="font-size:0.8rem;color:var(--text3);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:0.5rem;">Continue as</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.7rem;color:var(--gold);letter-spacing:0.05em;" id="continueName"></div>
+      </div>
+      <button class="btn" onclick="confirmContinue()">Continue</button>
+      <a class="forgot-link" onclick="switchToFullLogin()">Not you? Sign in as someone else</a>
+    </div>
+
+    <!-- NO ACCESS (signed in, but no entitlement for the app that sent them here) -->
+    <div class="panel" id="panelNoAccess">
+      <div style="text-align:center;padding:0.5rem 0 1.25rem;font-size:0.82rem;color:var(--text2);line-height:1.7;" id="noAccessMsg"></div>
+      <a class="forgot-link" onclick="switchToFullLogin()">Sign in as someone else</a>
+    </div>
+
     <!-- CREATE ACCOUNT -->
     <div class="panel" id="panelSignup">
       <div class="field">
@@ -115,7 +131,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    sendPasswordResetEmail, signOut
+    sendPasswordResetEmail, signOut, onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, setDoc
@@ -159,6 +175,40 @@
   const returnUrl = params.get("return"); // e.g. where to send them after success
   const fromApp = params.get("app");      // e.g. "bingo" — which app sent them here
 
+  // Each app gets its own independent 6-hour "you don't have to log in again"
+  // window, tracked separately per app in localStorage. Visiting a second app
+  // never touches the first app's clock — each one only resets when that
+  // specific app's own checkpoint is passed again.
+  const SESSION_MS = 6 * 60 * 60 * 1000;
+  function writeAppSession(uid, appKey) {
+    if (!appKey) return;
+    try { localStorage.setItem('gatewaySession_' + appKey, JSON.stringify({ ts: Date.now(), uid })); } catch (e) {}
+  }
+  // hq.html is entirely an admin console, so it's gated on admin-level access
+  // rather than plain entitlements — same as anyone visiting an app's admin
+  // area rather than its regular host-facing view.
+  function hasPermission(profile, appKey) {
+    if (!appKey) return true;
+    if (appKey === 'hq') return hasAdminAccess(profile, 'hq');
+    return !!(profile.entitlements && profile.entitlements[appKey]);
+  }
+  // Separate from entitlements: this is "do they have ADMIN-level access
+  // within this specific app" (settings/config tools, not just regular use).
+  // Someone can be a regular Trivia host (entitlements.trivia) without being
+  // a Trivia admin (adminAccess.trivia), and an admin can be scoped to only
+  // some apps — e.g. Trivia admin but not Bingo admin.
+  function hasAdminAccess(profile, appKey) {
+    return !!(profile.adminAccess && profile.adminAccess[appKey]);
+  }
+  function checkBan(profile) {
+    const now = Date.now();
+    const banUntilMs = profile.banUntil ? (profile.banUntil.toMillis ? profile.banUntil.toMillis() : profile.banUntil) : null;
+    return profile.status === "banned" && (banUntilMs === null || banUntilMs === undefined || banUntilMs > now);
+  }
+  function goToReturn() {
+    window.location.href = returnUrl || "https://belladonnanights.github.io/belladonna-hq/";
+  }
+
   function showMsg(text, type) {
     const box = document.getElementById("msgBox");
     box.textContent = text;
@@ -170,8 +220,51 @@
     box.textContent = "";
   }
 
+  // ── "Continue as" — shown when Firebase already recognizes this browser
+  // (they're signed into another app) and they've been sent here for a
+  // specific app. One click, no password, but it's still a real per-app
+  // checkpoint: it writes THIS app's own 6-hour session, nothing else.
+  let pendingContinueUid = null;
+  window.showContinueAs = function(name, uid) {
+    pendingContinueUid = uid;
+    document.getElementById('continueName').textContent = name;
+    ['panelSignin', 'panelSignup', 'panelForgot', 'panelNoAccess'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('panelContinue').classList.add('active');
+    document.querySelector('.toggle-row').style.display = 'none';
+  };
+  window.showNoAccess = function(name, appKey) {
+    document.getElementById('noAccessMsg').textContent = (name ? name + ", your" : "Your") + " account doesn't have access to " + (appKey || "this app") + " yet. Contact Belladonna if you think this is a mistake.";
+    ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('panelNoAccess').classList.add('active');
+    document.querySelector('.toggle-row').style.display = 'none';
+  };
+  window.switchToFullLogin = async function() {
+    await signOut(auth);
+    document.querySelector('.toggle-row').style.display = 'flex';
+    switchTab('signin');
+  };
+  window.confirmContinue = function() {
+    if (!pendingContinueUid) return;
+    writeAppSession(pendingContinueUid, fromApp);
+    goToReturn();
+  };
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user || !fromApp || !returnUrl) return; // nothing to fast-path — show the normal forms
+    try {
+      const profileSnap = await getDoc(doc(db, "users", user.uid));
+      const profile = profileSnap.exists() ? profileSnap.data() : {};
+      if (checkBan(profile)) { await signOut(auth); return; }
+      if (hasPermission(profile, fromApp)) showContinueAs(profile.name || user.email, user.uid);
+      else showNoAccess(profile.name, fromApp);
+    } catch (e) { /* fall back to the normal sign-in form */ }
+  });
+
   window.switchTab = function(which) {
     clearMsg();
+    document.querySelector('.toggle-row').style.display = 'flex';
+    document.getElementById("panelContinue").classList.remove("active");
+    document.getElementById("panelNoAccess").classList.remove("active");
     document.getElementById("panelSignin").classList.toggle("active", which === "signin");
     document.getElementById("panelSignup").classList.toggle("active", which === "signup");
     document.getElementById("panelForgot").classList.remove("active");
@@ -227,10 +320,15 @@
         return;
       }
 
+      if (fromApp && !hasPermission(profile, fromApp)) {
+        showNoAccess(profile.name, fromApp);
+        btn.disabled = false; btn.textContent = "Sign In";
+        return;
+      }
+
+      writeAppSession(cred.user.uid, fromApp);
       showMsg("Signed in — redirecting…", "success");
-      setTimeout(() => {
-        window.location.href = returnUrl || "https://belladonnanights.github.io/belladonna-hq/";
-      }, 700);
+      setTimeout(() => { goToReturn(); }, 700);
     } catch (e) {
       showMsg("Incorrect login or password.", "error");
       btn.disabled = false; btn.textContent = "Sign In";
@@ -309,10 +407,16 @@
         await setDoc(doc(db, "loginLookup", usernameKey), { email });
       }
 
+      // A brand-new self-signup has no access to anything yet, so if they
+      // arrived here trying to reach a specific gated app, they need to know
+      // that instead of being bounced back to a page that'll just deny them.
+      if (fromApp && !hasPermission({ entitlements, adminAccess: {} }, fromApp)) {
+        showNoAccess(name, fromApp);
+        return;
+      }
+
       showMsg("Account created! Redirecting…", "success");
-      setTimeout(() => {
-        window.location.href = returnUrl || "https://belladonnanights.github.io/belladonna-hq/";
-      }, 900);
+      setTimeout(() => { goToReturn(); }, 900);
     } catch (e) {
       if (e.code === "auth/email-already-in-use") {
         showMsg("That email already has an account — try signing in instead.", "error");
