@@ -184,12 +184,16 @@
     if (!appKey) return;
     try { localStorage.setItem('gatewaySession_' + appKey, JSON.stringify({ ts: Date.now(), uid })); } catch (e) {}
   }
-  // hq.html is entirely an admin console, so it's gated on admin-level access
-  // rather than plain entitlements — same as anyone visiting an app's admin
-  // area rather than its regular host-facing view.
+  // hq.html only requires being a signed-in Gateway account to walk in the
+  // door — NOT adminAccess.hq. That flag has to stay out of the entry gate on
+  // purpose: it's set from inside HQ's own Accounts tab, so gating entry on
+  // it would lock everyone out with no way to ever grant it to anyone,
+  // including yourself, the first time. HQ's own UI can still hide or block
+  // specific tools behind adminAccess.hq once someone's already in, if that's
+  // ever wanted — just not the front door.
   function hasPermission(profile, appKey) {
     if (!appKey) return true;
-    if (appKey === 'hq') return hasAdminAccess(profile, 'hq');
+    if (appKey === 'hq') return true;
     return !!(profile.entitlements && profile.entitlements[appKey]);
   }
   // Separate from entitlements: this is "do they have ADMIN-level access
