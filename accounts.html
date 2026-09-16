@@ -175,34 +175,27 @@
   const returnUrl = params.get("return"); // e.g. where to send them after success
   const fromApp = params.get("app");      // e.g. "bingo" — which app sent them here
 
-  // Each app gets its own independent 6-hour "you don't have to log in again"
-  // window, tracked separately per app in localStorage. Visiting a second app
-  // never touches the first app's clock — each one only resets when that
-  // specific app's own checkpoint is passed again.
+  // Apps that any signed-in account can use, with no specific entitlement check —
+  // HQ (admin-gated inside itself instead, so this stays the front door everyone
+  // can reach), and "shifts" (check-in/check-out), since every host needs those
+  // regardless of which other apps they have access to.
+  const OPEN_TO_ANY_SIGNED_IN = ['hq', 'shifts'];
+  function hasPermission(profile, appKey) {
+    if (!appKey) return true;
+    if (OPEN_TO_ANY_SIGNED_IN.includes(appKey)) return true;
+    return !!(profile.entitlements && profile.entitlements[appKey]);
+  }
+  // Separate from entitlements: "do they have ADMIN-level access within this
+  // specific app" (settings/config tools, not just regular use). Someone can be
+  // a regular Trivia host without being a Trivia admin, and an admin can be
+  // scoped to only some apps.
+  function hasAdminAccess(profile, appKey) {
+    return !!(profile.adminAccess && profile.adminAccess[appKey]);
+  }
   const SESSION_MS = 6 * 60 * 60 * 1000;
   function writeAppSession(uid, appKey) {
     if (!appKey) return;
     try { localStorage.setItem('gatewaySession_' + appKey, JSON.stringify({ ts: Date.now(), uid })); } catch (e) {}
-  }
-  // hq.html only requires being a signed-in Gateway account to walk in the
-  // door — NOT adminAccess.hq. That flag has to stay out of the entry gate on
-  // purpose: it's set from inside HQ's own Accounts tab, so gating entry on
-  // it would lock everyone out with no way to ever grant it to anyone,
-  // including yourself, the first time. HQ's own UI can still hide or block
-  // specific tools behind adminAccess.hq once someone's already in, if that's
-  // ever wanted — just not the front door.
-  function hasPermission(profile, appKey) {
-    if (!appKey) return true;
-    if (appKey === 'hq') return true;
-    return !!(profile.entitlements && profile.entitlements[appKey]);
-  }
-  // Separate from entitlements: this is "do they have ADMIN-level access
-  // within this specific app" (settings/config tools, not just regular use).
-  // Someone can be a regular Trivia host (entitlements.trivia) without being
-  // a Trivia admin (adminAccess.trivia), and an admin can be scoped to only
-  // some apps — e.g. Trivia admin but not Bingo admin.
-  function hasAdminAccess(profile, appKey) {
-    return !!(profile.adminAccess && profile.adminAccess[appKey]);
   }
   function checkBan(profile) {
     const now = Date.now();
@@ -411,14 +404,12 @@
         await setDoc(doc(db, "loginLookup", usernameKey), { email });
       }
 
-      // A brand-new self-signup has no access to anything yet, so if they
-      // arrived here trying to reach a specific gated app, they need to know
-      // that instead of being bounced back to a page that'll just deny them.
       if (fromApp && !hasPermission({ entitlements, adminAccess: {} }, fromApp)) {
         showNoAccess(name, fromApp);
         return;
       }
 
+      writeAppSession(uid, fromApp);
       showMsg("Account created! Redirecting…", "success");
       setTimeout(() => { goToReturn(); }, 900);
     } catch (e) {
