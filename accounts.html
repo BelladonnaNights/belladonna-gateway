@@ -122,6 +122,35 @@
       <button class="btn" id="signupBtn" onclick="doSignUp()">Create Account</button>
       <div class="field-hint" style="text-align:center;margin-top:1rem;">This account works across every Belladonna app. Access to each one depends on what you've subscribed to.</div>
     </div>
+
+    <!-- MY ACCOUNT (already signed in, arrived via ?view=account from an app's "My Account" link) -->
+    <div class="panel" id="panelAccount">
+      <div style="text-align:center;padding:0.25rem 0 1.25rem;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--gold);letter-spacing:0.04em;" id="acctName"></div>
+        <div style="font-size:0.75rem;color:var(--text3);margin-top:0.2rem;" id="acctEmail"></div>
+      </div>
+
+      <div style="font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:0.6rem;">Your Access</div>
+      <div id="acctAccessList" style="font-size:0.78rem;color:var(--text2);line-height:2;margin-bottom:1.6rem;"></div>
+      <div style="font-size:0.66rem;color:var(--text4);margin:-1.2rem 0 1.6rem;line-height:1.5;">Access is managed by Belladonna — contact them if something here needs to change.</div>
+
+      <div style="font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:0.8rem;">Change Password</div>
+      <div class="field">
+        <label>Current Password</label>
+        <input type="password" id="cpCurrent" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label>New Password</label>
+        <input type="password" id="cpNew" placeholder="At least 6 characters" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>Confirm New Password</label>
+        <input type="password" id="cpConfirm" placeholder="Repeat new password" autocomplete="new-password">
+      </div>
+      <button class="btn" id="cpBtn" onclick="doChangePassword()">Update Password</button>
+
+      <a class="forgot-link" onclick="doAccountSignOut()" style="margin-top:1.5rem;">Sign Out</a>
+    </div>
   </div>
 
   <div class="footer-note">Belladonna Nights</div>
@@ -131,7 +160,8 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    sendPasswordResetEmail, signOut, onAuthStateChanged
+    sendPasswordResetEmail, signOut, onAuthStateChanged,
+    updatePassword, reauthenticateWithCredential, EmailAuthProvider
   } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, setDoc
@@ -174,6 +204,7 @@
   const params = new URLSearchParams(window.location.search);
   const returnUrl = params.get("return"); // e.g. where to send them after success
   const fromApp = params.get("app");      // e.g. "bingo" — which app sent them here
+  const view = params.get("view");        // "account" — came here from a "My Account" link, not a login redirect
 
   // Apps that any signed-in account can use, with no specific entitlement check —
   // HQ (admin-gated inside itself instead, so this stays the front door everyone
@@ -246,8 +277,71 @@
     goToReturn();
   };
 
+  // ── My Account — arrived via ?view=account from an already-signed-in app,
+  // not a login redirect. Shows their access (read-only) and lets them change
+  // their own password. ──────────────────────────────────────────────────
+  const ACCESS_LABELS = { bingo: 'Bingo', trivia: 'Trivia', mediaPlayer: 'Media Player', training: 'Training' };
+  function showAccountView(profile) {
+    document.querySelector('.toggle-row').style.display = 'none';
+    ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue', 'panelNoAccess'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('acctName').textContent = profile.name || 'Account';
+    document.getElementById('acctEmail').textContent = profile.email || auth.currentUser.email || '';
+    const have = Object.keys(ACCESS_LABELS).filter(k => profile.entitlements && profile.entitlements[k]);
+    const adminOf = Object.keys(profile.adminAccess || {}).filter(k => profile.adminAccess[k]);
+    const listEl = document.getElementById('acctAccessList');
+    if (!have.length && !adminOf.length) {
+      listEl.innerHTML = '<div style="color:var(--text4);">No app access yet — contact Belladonna to get set up.</div>';
+    } else {
+      listEl.innerHTML = have.map(k => '<div>' + ACCESS_LABELS[k] + '</div>').join('')
+        + adminOf.map(k => '<div style="color:var(--gold);">' + (ACCESS_LABELS[k] || k) + ' — Admin</div>').join('');
+    }
+    document.getElementById('panelAccount').classList.add('active');
+  }
+  window.doAccountSignOut = async function() {
+    try { Object.keys(localStorage).filter(k => k.startsWith('gatewaySession_')).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    await signOut(auth);
+    document.querySelector('.toggle-row').style.display = 'flex';
+    document.getElementById('panelAccount').classList.remove('active');
+    switchTab('signin');
+  };
+  window.doChangePassword = async function() {
+    clearMsg();
+    const current = document.getElementById('cpCurrent').value;
+    const next = document.getElementById('cpNew').value;
+    const confirm = document.getElementById('cpConfirm').value;
+    const btn = document.getElementById('cpBtn');
+    if (!current || !next) { showMsg('Enter your current and new password.', 'error'); return; }
+    if (next.length < 6) { showMsg('New password must be at least 6 characters.', 'error'); return; }
+    if (next !== confirm) { showMsg("New passwords don't match.", 'error'); return; }
+    btn.disabled = true; btn.textContent = 'Updating…';
+    try {
+      const user = auth.currentUser;
+      const cred = EmailAuthProvider.credential(user.email, current);
+      await reauthenticateWithCredential(user, cred); // proves they know the current password, and satisfies Firebase's recency requirement for sensitive changes
+      await updatePassword(user, next);
+      showMsg('Password updated.', 'success');
+      document.getElementById('cpCurrent').value = '';
+      document.getElementById('cpNew').value = '';
+      document.getElementById('cpConfirm').value = '';
+    } catch (e) {
+      if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') showMsg('Current password is incorrect.', 'error');
+      else showMsg('Something went wrong. Please try again.', 'error');
+    }
+    btn.disabled = false; btn.textContent = 'Update Password';
+  };
+
   onAuthStateChanged(auth, async (user) => {
-    if (!user || !fromApp || !returnUrl) return; // nothing to fast-path — show the normal forms
+    if (!user) return;
+    if (view === 'account') {
+      try {
+        const profileSnap = await getDoc(doc(db, "users", user.uid));
+        const profile = profileSnap.exists() ? profileSnap.data() : {};
+        if (checkBan(profile)) { await signOut(auth); return; }
+        showAccountView(profile);
+      } catch (e) { /* fall back to the normal sign-in form */ }
+      return;
+    }
+    if (!fromApp || !returnUrl) return; // nothing to fast-path — show the normal forms
     try {
       const profileSnap = await getDoc(doc(db, "users", user.uid));
       const profile = profileSnap.exists() ? profileSnap.data() : {};
@@ -262,6 +356,7 @@
     document.querySelector('.toggle-row').style.display = 'flex';
     document.getElementById("panelContinue").classList.remove("active");
     document.getElementById("panelNoAccess").classList.remove("active");
+    document.getElementById("panelAccount").classList.remove("active");
     document.getElementById("panelSignin").classList.toggle("active", which === "signin");
     document.getElementById("panelSignup").classList.toggle("active", which === "signup");
     document.getElementById("panelForgot").classList.remove("active");
