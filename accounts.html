@@ -422,10 +422,27 @@
       showMsg("Signed in — redirecting…", "success");
       setTimeout(() => { goToReturn(); }, 700);
     } catch (e) {
-      showMsg("Incorrect login or password.", "error");
+      console.error('Sign-in failed:', e.code, e.message);
+      showMsg(signInErrorMessage(e), "error");
       btn.disabled = false; btn.textContent = "Sign In";
     }
   };
+  function signInErrorMessage(e) {
+    switch (e.code) {
+      case "auth/invalid-credential":
+      case "auth/wrong-password":
+      case "auth/user-not-found":
+        return "That password didn't match. Double-check for typos or caps lock — or use Forgot Password below.";
+      case "auth/too-many-requests":
+        return "Too many attempts — this account is temporarily locked for a few minutes. Forgot Password will reset it immediately instead of waiting.";
+      case "auth/network-request-failed":
+        return "Network error — check your connection and try again.";
+      case "auth/user-disabled":
+        return "This account has been disabled. Contact Belladonna.";
+      default:
+        return "Sign-in failed (" + (e.code || "unknown error") + "). Try again, or contact Belladonna if this keeps happening.";
+    }
+  }
 
   // ── Forgot password ──────────────────────────────────────────────────────
   window.doForgotPassword = async function() {
@@ -441,7 +458,9 @@
       await sendPasswordResetEmail(auth, email);
       showMsg("Check your email for a password reset link.", "success");
     } catch (e) {
-      showMsg("Something went wrong. Please try again.", "error");
+      console.error('Password reset failed:', e.code, e.message);
+      if (e.code === 'auth/too-many-requests') showMsg("Too many reset requests — wait a few minutes and try again.", "error");
+      else showMsg("Something went wrong (" + (e.code || 'unknown error') + "). Please try again.", "error");
     }
     btn.disabled = false; btn.textContent = "Send Reset Link";
   };
