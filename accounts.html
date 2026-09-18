@@ -60,14 +60,15 @@
     <div class="panel active" id="panelSignin">
       <div class="field">
         <label>Email, Username, or Host ID</label>
-        <input type="text" id="signinIdentifier" placeholder="you@email.com, yourname, or BD-014" autocomplete="username">
+        <input type="text" id="signinIdentifier" placeholder="you@email.com, yourname, or BD-014" autocomplete="username" onkeydown="if(event.key==='Enter'){event.preventDefault();doSignIn();}">
       </div>
       <div class="field">
         <label>Password</label>
-        <input type="password" id="signinPassword" placeholder="••••••••" autocomplete="current-password">
+        <input type="password" id="signinPassword" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();doSignIn();}">
       </div>
       <button class="btn" id="signinBtn" onclick="doSignIn()">Sign In</button>
       <a class="forgot-link" onclick="showForgot()">Forgot password?</a>
+      <a class="forgot-link" onclick="doTroubleReset()">Trouble signing in? Reset this browser</a>
     </div>
 
     <!-- FORGOT PASSWORD -->
@@ -383,6 +384,29 @@
   }
 
   // ── Sign in ──────────────────────────────────────────────────────────────
+  window.doTroubleReset = async function() {
+    if (!confirm("This clears saved sign-in data for this site in this browser and reloads the page — you'll need to sign in again after. Continue?")) return;
+    try { await signOut(auth); } catch (e) { /* ignore — may already be signed out */ }
+    try { localStorage.clear(); } catch (e) {}
+    try { sessionStorage.clear(); } catch (e) {}
+    try {
+      if (indexedDB && indexedDB.databases) {
+        const dbs = await indexedDB.databases();
+        await Promise.all(dbs.map(d => new Promise(res => {
+          const req = indexedDB.deleteDatabase(d.name);
+          req.onsuccess = req.onerror = req.onblocked = () => res();
+        })));
+      } else {
+        // Safari (older versions) doesn't support indexedDB.databases() to enumerate —
+        // delete Firebase's known database names directly as a best effort.
+        ["firebaseLocalStorageDb", "firebase-installations-database", "firebase-heartbeat-database"].forEach(name => {
+          try { indexedDB.deleteDatabase(name); } catch (e) {}
+        });
+      }
+    } catch (e) { console.warn('IndexedDB clear incomplete:', e); }
+    window.location.reload();
+  };
+
   window.doSignIn = async function() {
     clearMsg();
     const identifier = document.getElementById("signinIdentifier").value.trim();
