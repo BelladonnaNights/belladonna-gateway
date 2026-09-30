@@ -40,6 +40,38 @@
   .forgot-link{display:block;text-align:center;margin-top:1rem;font-size:0.7rem;letter-spacing:0.03em;color:var(--text3);text-decoration:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .forgot-link:hover{color:var(--gold);}
   .footer-note{text-align:center;font-size:0.62rem;letter-spacing:0.16em;color:var(--text4);margin-top:1.75rem;text-transform:uppercase;line-height:1.8;font-family:'DM Sans',sans-serif;}
+
+  /* ── HOST SETUP WIZARD ── */
+  .hs-progress-wrap{margin-bottom:1.3rem;}
+  .hs-progress-label{font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:0.5rem;text-align:center;}
+  .hs-progress-bar{height:4px;background:var(--surface2);border-radius:999px;overflow:hidden;}
+  .hs-progress-fill{height:100%;background:var(--gold);transition:width 0.3s;}
+  .hs-section-title{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold);letter-spacing:0.04em;margin-bottom:0.3rem;}
+  .hs-section-desc{font-size:0.78rem;color:var(--text3);line-height:1.6;margin-bottom:1.3rem;}
+  .hs-q{margin-bottom:1.3rem;}
+  .hs-q-label{display:block;font-size:0.8rem;color:var(--text);margin-bottom:0.4rem;line-height:1.5;}
+  .hs-q-label .req{color:var(--gold);margin-left:0.2rem;}
+  .hs-q-help{font-size:0.68rem;color:var(--text4);margin-bottom:0.5rem;line-height:1.5;}
+  .hs-q textarea,.hs-q select,.hs-q input[type="text"]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:0.65rem 0.8rem;font-size:0.85rem;font-family:'DM Sans',sans-serif;outline:none;}
+  .hs-q textarea{min-height:70px;resize:vertical;}
+  .hs-q textarea:focus,.hs-q select:focus,.hs-q input[type="text"]:focus{border-color:var(--gold);}
+  .hs-choice-row{display:flex;align-items:flex-start;gap:0.55rem;padding:0.5rem 0;cursor:pointer;font-size:0.82rem;color:var(--text2);}
+  .hs-choice-row input{margin-top:0.2rem;width:15px;height:15px;flex:none;accent-color:var(--gold);cursor:pointer;}
+  .hs-yesno-row{display:flex;gap:0.5rem;}
+  .hs-yesno-btn{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text2);padding:0.55rem;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s;}
+  .hs-yesno-btn.selected{background:var(--gold-dim);border-color:var(--border-gold);color:var(--gold);}
+  .hs-file-current{font-size:0.68rem;color:var(--text3);margin-bottom:0.4rem;}
+  .hs-file-current a{color:var(--gold);}
+  .hs-nav{display:flex;gap:0.6rem;margin-top:1.5rem;}
+  .hs-nav .btn{margin-top:0;}
+  .hs-nav .btn.secondary{background:none;color:var(--text3);border-color:var(--border);}
+  .hs-nav .btn.secondary:hover{background:var(--surface2);}
+  .hs-skip-link{display:block;text-align:center;margin-top:1rem;font-size:0.68rem;color:var(--text4);text-decoration:none;cursor:pointer;}
+  .hs-skip-link:hover{color:var(--text3);}
+  .hs-status-block{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.9rem 1rem;margin-bottom:1.6rem;}
+  .hs-status-title{font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:0.5rem;}
+  .hs-status-line{font-size:0.8rem;color:var(--text2);margin-bottom:0.7rem;}
+  .hs-status-line.done{color:var(--success);}
 </style>
 </head>
 <body>
@@ -131,6 +163,12 @@
         <div style="font-size:0.75rem;color:var(--text3);margin-top:0.2rem;" id="acctEmail"></div>
       </div>
 
+      <div class="hs-status-block" id="hsStatusBlock" style="display:none;">
+        <div class="hs-status-title">Host Setup</div>
+        <div class="hs-status-line" id="hsStatusLine"></div>
+        <button class="btn" id="hsStatusBtn" onclick="openHostSetup(false)" style="margin-top:0;"></button>
+      </div>
+
       <div style="font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:0.6rem;">Your Access</div>
       <div id="acctAccessList" style="font-size:0.78rem;color:var(--text2);line-height:2;margin-bottom:1.6rem;"></div>
       <div style="font-size:0.66rem;color:var(--text4);margin:-1.2rem 0 1.6rem;line-height:1.5;">Access is managed by Belladonna — contact them if something here needs to change.</div>
@@ -152,6 +190,24 @@
 
       <a class="forgot-link" onclick="doAccountSignOut()" style="margin-top:1.5rem;">Sign Out</a>
     </div>
+
+    <!-- HOST SETUP WIZARD -->
+    <div class="panel" id="panelHostSetup">
+      <div class="hs-progress-wrap">
+        <div class="hs-progress-label" id="hsProgressLabel"></div>
+        <div class="hs-progress-bar"><div class="hs-progress-fill" id="hsProgressFill" style="width:0%;"></div></div>
+      </div>
+      <div class="msg" id="hsMsgBox"></div>
+      <div class="hs-section-title" id="hsSectionTitle"></div>
+      <div class="hs-section-desc" id="hsSectionDesc"></div>
+      <div id="hsQuestions"></div>
+      <div class="hs-nav">
+        <button class="btn secondary" id="hsBackBtn" onclick="hsGoBack()" style="display:none;">← Back</button>
+        <button class="btn" id="hsNextBtn" onclick="hsGoNext()">Next</button>
+      </div>
+      <a class="hs-skip-link" id="hsSkipLink" onclick="hsSkip()" style="display:none;">Skip for now — I'll finish this later from My Account</a>
+      <a class="hs-skip-link" id="hsExitLink" onclick="hsExitToAccount()" style="display:none;">Save &amp; exit to My Account</a>
+    </div>
   </div>
 
   <div class="footer-note">Belladonna Nights</div>
@@ -170,6 +226,9 @@
   import {
     getDatabase, ref, set as rtdbSet
   } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+  import {
+    getStorage, ref as storageRef, uploadBytes, getDownloadURL
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCIfAE1JGHsUGzzVH2pz1Vyj5b5OhA0tDQ",
@@ -185,6 +244,7 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
   const rtdb = getDatabase(app);
+  const storage = getStorage(app);
 
   // Realtime Database's security rules can't see Firestore at all — they can only
   // check other Realtime Database data. So every account's app access has to be
@@ -257,13 +317,13 @@
   window.showContinueAs = function(name, uid) {
     pendingContinueUid = uid;
     document.getElementById('continueName').textContent = name;
-    ['panelSignin', 'panelSignup', 'panelForgot', 'panelNoAccess'].forEach(id => document.getElementById(id).classList.remove('active'));
+    ['panelSignin', 'panelSignup', 'panelForgot', 'panelNoAccess', 'panelAccount', 'panelHostSetup'].forEach(id => document.getElementById(id).classList.remove('active'));
     document.getElementById('panelContinue').classList.add('active');
     document.querySelector('.toggle-row').style.display = 'none';
   };
   window.showNoAccess = function(name, appKey) {
     document.getElementById('noAccessMsg').textContent = (name ? name + ", your" : "Your") + " account doesn't have access to " + (appKey || "this app") + " yet. Contact Belladonna if you think this is a mistake.";
-    ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue'].forEach(id => document.getElementById(id).classList.remove('active'));
+    ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue', 'panelAccount', 'panelHostSetup'].forEach(id => document.getElementById(id).classList.remove('active'));
     document.getElementById('panelNoAccess').classList.add('active');
     document.querySelector('.toggle-row').style.display = 'none';
   };
@@ -282,9 +342,9 @@
   // not a login redirect. Shows their access (read-only) and lets them change
   // their own password. ──────────────────────────────────────────────────
   const ACCESS_LABELS = { bingo: 'Bingo', trivia: 'Trivia', mediaPlayer: 'Media Player', training: 'Training' };
-  function showAccountView(profile) {
+  async function showAccountView(profile) {
     document.querySelector('.toggle-row').style.display = 'none';
-    ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue', 'panelNoAccess'].forEach(id => document.getElementById(id).classList.remove('active'));
+    ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue', 'panelNoAccess', 'panelHostSetup'].forEach(id => document.getElementById(id).classList.remove('active'));
     document.getElementById('acctName').textContent = profile.name || 'Account';
     document.getElementById('acctEmail').textContent = profile.email || auth.currentUser.email || '';
     const have = Object.keys(ACCESS_LABELS).filter(k => profile.entitlements && profile.entitlements[k]);
@@ -297,6 +357,13 @@
         + adminOf.map(k => '<div style="color:var(--gold);">' + (ACCESS_LABELS[k] || k) + ' — Admin</div>').join('');
     }
     document.getElementById('panelAccount').classList.add('active');
+    if (!hsSchema) {
+      try {
+        const snap = await getDoc(doc(db, 'hq_data', 'hostSetupSchema'));
+        hsSchema = snap.exists() ? JSON.parse(snap.data().value) : { sections: [] };
+      } catch (e) { hsSchema = { sections: [] }; }
+    }
+    updateHostSetupStatus(profile);
   }
   window.doAccountSignOut = async function() {
     try { Object.keys(localStorage).filter(k => k.startsWith('gatewaySession_')).forEach(k => localStorage.removeItem(k)); } catch (e) {}
@@ -358,6 +425,7 @@
     document.getElementById("panelContinue").classList.remove("active");
     document.getElementById("panelNoAccess").classList.remove("active");
     document.getElementById("panelAccount").classList.remove("active");
+    document.getElementById("panelHostSetup").classList.remove("active");
     document.getElementById("panelSignin").classList.toggle("active", which === "signin");
     document.getElementById("panelSignup").classList.toggle("active", which === "signup");
     document.getElementById("panelForgot").classList.remove("active");
@@ -548,8 +616,8 @@
       }
 
       writeAppSession(uid, fromApp);
-      showMsg("Account created! Redirecting…", "success");
-      setTimeout(() => { goToReturn(); }, 900);
+      hsPostSignupUid = uid;
+      openHostSetup(true);
     } catch (e) {
       if (e.code === "auth/email-already-in-use") {
         showMsg("That email already has an account — try signing in instead.", "error");
@@ -558,6 +626,257 @@
       }
       btn.disabled = false; btn.textContent = "Create Account";
     }
+  };
+
+  // ── HOST SETUP WIZARD ─────────────────────────────────────────────────────
+  // Schema (sections/questions Ahnna builds in HQ > Hosts > Onboarding) lives
+  // at hq_data/hostSetupSchema, same public-JSON-blob convention every other
+  // HQ list uses. Answers live on the user's own profile at users/{uid}.hostSetup
+  // — writable by that user under the existing rules (hostSetup isn't in the
+  // self-update blocklist), so no rule changes were needed for any of this.
+  let hsSchema = null;
+  let hsAnswers = {};
+  let hsPendingFiles = {};
+  let hsSectionIndex = 0;
+  let hsCurrentUid = null;
+  let hsPostSignupUid = null;
+  let hsStartedAt = null;
+  let hsExistingCompletedAt = null;
+
+  function hsEsc(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function showHsMsg(text, type) { const box = document.getElementById('hsMsgBox'); box.textContent = text; box.className = 'msg ' + type; }
+  function clearHsMsg() { const box = document.getElementById('hsMsgBox'); box.className = 'msg'; box.textContent = ''; }
+
+  function updateHostSetupStatus(profile) {
+    const block = document.getElementById('hsStatusBlock');
+    const line = document.getElementById('hsStatusLine');
+    const btn = document.getElementById('hsStatusBtn');
+    if (!hsSchema || !hsSchema.sections || !hsSchema.sections.length) { block.style.display = 'none'; return; }
+    block.style.display = '';
+    const hs = profile.hostSetup;
+    if (hs && hs.completedAt) {
+      line.textContent = '✓ Completed ' + new Date(hs.completedAt).toLocaleDateString();
+      line.classList.add('done');
+      btn.textContent = 'Edit Answers';
+    } else {
+      line.textContent = (hs && hs.answers && Object.keys(hs.answers).length)
+        ? "You started this but haven't finished yet."
+        : 'Please complete your host setup — it only takes a few minutes.';
+      line.classList.remove('done');
+      btn.textContent = 'Complete Host Setup';
+    }
+  }
+
+  window.openHostSetup = async function(isPostSignup) {
+    if (!isPostSignup) hsPostSignupUid = null;
+    document.querySelector('.toggle-row').style.display = 'none';
+    ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue', 'panelNoAccess', 'panelAccount'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('panelHostSetup').classList.add('active');
+    document.getElementById('hsSkipLink').style.display = isPostSignup ? '' : 'none';
+    document.getElementById('hsExitLink').style.display = isPostSignup ? 'none' : '';
+
+    hsCurrentUid = auth.currentUser ? auth.currentUser.uid : hsPostSignupUid;
+    if (!hsCurrentUid) { hsBackToAccount(); return; }
+
+    if (!hsSchema) {
+      try {
+        const snap = await getDoc(doc(db, 'hq_data', 'hostSetupSchema'));
+        hsSchema = snap.exists() ? JSON.parse(snap.data().value) : { sections: [] };
+      } catch (e) { hsSchema = { sections: [] }; }
+    }
+    if (!hsSchema.sections || !hsSchema.sections.length) {
+      // Nothing built yet in HQ — nothing to fill out.
+      if (isPostSignup) { hsPostSignupUid = null; goToReturn(); } else { hsBackToAccount(); }
+      return;
+    }
+
+    try {
+      const uSnap = await getDoc(doc(db, 'users', hsCurrentUid));
+      const profile = uSnap.exists() ? uSnap.data() : {};
+      const hs = profile.hostSetup || {};
+      hsAnswers = hs.answers ? JSON.parse(JSON.stringify(hs.answers)) : {};
+      hsStartedAt = hs.startedAt || new Date().toISOString();
+      hsExistingCompletedAt = hs.completedAt || null;
+    } catch (e) { hsAnswers = {}; hsStartedAt = new Date().toISOString(); hsExistingCompletedAt = null; }
+
+    hsPendingFiles = {};
+    hsSectionIndex = 0;
+    hsRenderSection();
+  };
+
+  function hsRenderSection() {
+    clearHsMsg();
+    const section = hsSchema.sections[hsSectionIndex];
+    document.getElementById('hsProgressLabel').textContent = 'Section ' + (hsSectionIndex + 1) + ' of ' + hsSchema.sections.length;
+    document.getElementById('hsProgressFill').style.width = Math.round((hsSectionIndex / hsSchema.sections.length) * 100) + '%';
+    document.getElementById('hsSectionTitle').textContent = section.title || '';
+    document.getElementById('hsSectionDesc').textContent = section.description || '';
+    document.getElementById('hsQuestions').innerHTML = (section.questions || []).map(hsRenderQuestion).join('');
+    hsApplyConditionals();
+    document.getElementById('hsBackBtn').style.display = hsSectionIndex > 0 ? '' : 'none';
+    document.getElementById('hsNextBtn').disabled = false;
+    document.getElementById('hsNextBtn').textContent = hsSectionIndex === hsSchema.sections.length - 1 ? 'Finish' : 'Next';
+    document.getElementById('panelHostSetup').scrollIntoView({ block: 'start' });
+  }
+
+  function hsRenderQuestion(q) {
+    const val = hsAnswers[q.id];
+    const help = q.helpText ? '<div class="hs-q-help">' + hsEsc(q.helpText) + '</div>' : '';
+    let body = '';
+    if (q.type === 'acknowledge') {
+      body = '<label class="hs-choice-row"><input type="checkbox" ' + (val === true ? 'checked' : '') + ' onchange="hsOnAckChange(\'' + q.id + '\',this.checked)"><span>' + hsEsc(q.label) + '</span></label>';
+      return '<div class="hs-q" data-qwrap="' + q.id + '">' + body + help + '</div>';
+    }
+    const reqMark = q.required ? '<span class="req">*</span>' : '';
+    if (q.type === 'short') {
+      body = '<input type="text" value="' + hsEsc(val || '') + '" oninput="hsOnTextChange(\'' + q.id + '\',this.value)">';
+    } else if (q.type === 'paragraph') {
+      body = '<textarea oninput="hsOnTextChange(\'' + q.id + '\',this.value)">' + hsEsc(val || '') + '</textarea>';
+    } else if (q.type === 'dropdown') {
+      body = '<select onchange="hsOnTextChange(\'' + q.id + '\',this.value)"><option value="">Select…</option>'
+        + (q.options || []).map(o => '<option value="' + hsEsc(o) + '"' + (val === o ? ' selected' : '') + '>' + hsEsc(o) + '</option>').join('')
+        + '</select>';
+    } else if (q.type === 'radio') {
+      body = (q.options || []).map(o => '<label class="hs-choice-row"><input type="radio" name="hsRadio_' + q.id + '" value="' + hsEsc(o) + '" ' + (val === o ? 'checked' : '') + ' onchange="hsOnTextChange(\'' + q.id + '\',this.value)"><span>' + hsEsc(o) + '</span></label>').join('');
+    } else if (q.type === 'yesno') {
+      body = '<div class="hs-yesno-row">'
+        + '<button type="button" class="hs-yesno-btn ' + (val === 'Yes' ? 'selected' : '') + '" onclick="hsSetYesNo(\'' + q.id + '\',\'Yes\',this)">Yes</button>'
+        + '<button type="button" class="hs-yesno-btn ' + (val === 'No' ? 'selected' : '') + '" onclick="hsSetYesNo(\'' + q.id + '\',\'No\',this)">No</button>'
+        + '</div>';
+    } else if (q.type === 'checkboxes') {
+      const arr = Array.isArray(val) ? val : [];
+      body = (q.options || []).map(o => '<label class="hs-choice-row"><input type="checkbox" value="' + hsEsc(o) + '" ' + (arr.includes(o) ? 'checked' : '') + ' onchange="hsOnCheckboxChange(\'' + q.id + '\',this.value,this.checked)"><span>' + hsEsc(o) + '</span></label>').join('');
+    } else if (q.type === 'file') {
+      const existing = val && val.fileUrl;
+      body = (existing ? '<div class="hs-file-current">Current: <a href="' + existing + '" target="_blank">' + hsEsc(val.fileName || 'view file') + '</a></div>' : '')
+        + '<input type="file" onchange="hsOnFileChange(\'' + q.id + '\',this)">';
+    }
+    return '<div class="hs-q" data-qwrap="' + q.id + '">'
+      + '<label class="hs-q-label">' + hsEsc(q.label) + reqMark + '</label>' + help + body
+      + '</div>';
+  }
+
+  function hsQuestionVisible(q) {
+    if (!q.showIf) return true;
+    const dep = hsAnswers[q.showIf.questionId];
+    const anyOf = q.showIf.anyOf || [];
+    if (Array.isArray(dep)) return dep.some(v => anyOf.includes(v));
+    return anyOf.includes(dep);
+  }
+  function hsApplyConditionals() {
+    const section = hsSchema.sections[hsSectionIndex];
+    (section.questions || []).forEach(q => {
+      const wrap = document.querySelector('[data-qwrap="' + q.id + '"]');
+      if (wrap) wrap.style.display = hsQuestionVisible(q) ? '' : 'none';
+    });
+  }
+
+  window.hsOnTextChange = function(qid, val) { hsAnswers[qid] = val; hsApplyConditionals(); };
+  window.hsOnCheckboxChange = function(qid, val, checked) {
+    const arr = Array.isArray(hsAnswers[qid]) ? hsAnswers[qid].slice() : [];
+    if (checked) { if (!arr.includes(val)) arr.push(val); } else { const i = arr.indexOf(val); if (i > -1) arr.splice(i, 1); }
+    hsAnswers[qid] = arr;
+    hsApplyConditionals();
+  };
+  window.hsSetYesNo = function(qid, val, btnEl) {
+    hsAnswers[qid] = val;
+    btnEl.parentElement.querySelectorAll('.hs-yesno-btn').forEach(b => b.classList.remove('selected'));
+    btnEl.classList.add('selected');
+    hsApplyConditionals();
+  };
+  window.hsOnAckChange = function(qid, checked) { hsAnswers[qid] = checked; };
+  window.hsOnFileChange = function(qid, inputEl) {
+    const f = inputEl.files && inputEl.files[0];
+    if (f) hsPendingFiles[qid] = f;
+  };
+
+  function hsValidateSection() {
+    const section = hsSchema.sections[hsSectionIndex];
+    for (const q of (section.questions || [])) {
+      if (!hsQuestionVisible(q) || !q.required) continue;
+      const val = hsAnswers[q.id];
+      if (q.type === 'file') { if (!hsPendingFiles[q.id] && !(val && val.fileUrl)) return q; }
+      else if (q.type === 'checkboxes') { if (!Array.isArray(val) || !val.length) return q; }
+      else if (q.type === 'acknowledge') { if (val !== true) return q; }
+      else if (!val || (typeof val === 'string' && !val.trim())) return q;
+    }
+    return null;
+  }
+
+  async function hsUploadPendingFiles() {
+    const ids = Object.keys(hsPendingFiles);
+    for (const qid of ids) {
+      const file = hsPendingFiles[qid];
+      const path = 'hostSetup/' + hsCurrentUid + '/' + qid + '-' + Date.now() + '-' + file.name;
+      const sRef = storageRef(storage, path);
+      await uploadBytes(sRef, file);
+      const url = await getDownloadURL(sRef);
+      hsAnswers[qid] = { fileUrl: url, fileName: file.name };
+    }
+    hsPendingFiles = {};
+  }
+
+  async function hsSaveProgress(completed) {
+    const payload = {
+      hostSetup: {
+        answers: hsAnswers,
+        startedAt: hsStartedAt || new Date().toISOString(),
+        completedAt: completed ? new Date().toISOString() : (hsExistingCompletedAt || null)
+      }
+    };
+    if (completed) hsExistingCompletedAt = payload.hostSetup.completedAt;
+    await setDoc(doc(db, 'users', hsCurrentUid), payload, { merge: true });
+  }
+
+  function hsBackToAccount() {
+    document.getElementById('panelHostSetup').classList.remove('active');
+    if (!hsCurrentUid) { switchTab('signin'); return; }
+    getDoc(doc(db, 'users', hsCurrentUid)).then(snap => {
+      const profile = snap.exists() ? snap.data() : {};
+      showAccountView(profile);
+    }).catch(() => { switchTab('signin'); });
+  }
+
+  window.hsGoBack = function() {
+    if (hsSectionIndex === 0) return;
+    hsSectionIndex--;
+    hsRenderSection();
+  };
+
+  window.hsGoNext = async function() {
+    const missing = hsValidateSection();
+    if (missing) { showHsMsg('Please answer "' + missing.label + '" before continuing.', 'error'); return; }
+    const isLast = hsSectionIndex === hsSchema.sections.length - 1;
+    document.getElementById('hsNextBtn').disabled = true;
+    document.getElementById('hsNextBtn').textContent = isLast ? 'Finishing…' : 'Saving…';
+    try {
+      await hsUploadPendingFiles();
+      await hsSaveProgress(isLast);
+    } catch (e) {
+      showHsMsg('Could not save — check your connection and try again.', 'error');
+      document.getElementById('hsNextBtn').disabled = false;
+      document.getElementById('hsNextBtn').textContent = isLast ? 'Finish' : 'Next';
+      return;
+    }
+    if (isLast) {
+      if (hsPostSignupUid) { hsPostSignupUid = null; goToReturn(); }
+      else { hsBackToAccount(); }
+    } else {
+      hsSectionIndex++;
+      hsRenderSection();
+    }
+  };
+
+  window.hsSkip = function() {
+    hsSaveProgress(false).catch(() => {});
+    hsPostSignupUid = null;
+    goToReturn();
+  };
+
+  window.hsExitToAccount = async function() {
+    document.getElementById('hsNextBtn').disabled = true;
+    try { await hsUploadPendingFiles(); await hsSaveProgress(false); } catch (e) {}
+    hsBackToAccount();
   };
 </script>
 </body>
