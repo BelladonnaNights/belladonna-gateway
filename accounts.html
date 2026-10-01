@@ -266,6 +266,7 @@
   const returnUrl = params.get("return"); // e.g. where to send them after success
   const fromApp = params.get("app");      // e.g. "bingo" — which app sent them here
   const view = params.get("view");        // "account" — came here from a "My Account" link, not a login redirect
+  const hostSetupPreview = params.get("hostSetupPreview") === "1"; // opened from HQ's "Preview as Host" button — no sign-in needed, nothing saved
 
   // Apps that any signed-in account can use, with no specific entitlement check —
   // HQ (admin-gated inside itself instead, so this stays the front door everyone
@@ -642,6 +643,8 @@
   let hsPostSignupUid = null;
   let hsStartedAt = null;
   let hsExistingCompletedAt = null;
+  let hsPreviewMode = false; // true only in the HQ "Preview as Host" tab — nothing gets saved
+  let hsPreviewEnded = false;
 
   function hsEsc(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function showHsMsg(text, type) { const box = document.getElementById('hsMsgBox'); box.textContent = text; box.className = 'msg ' + type; }
@@ -805,6 +808,13 @@
 
   async function hsUploadPendingFiles() {
     const ids = Object.keys(hsPendingFiles);
+    if (hsPreviewMode) {
+      // Preview mode: nothing is actually uploaded — just fake a result so the
+      // rest of the flow (validation, the "file chosen" state) behaves normally.
+      ids.forEach(qid => { hsAnswers[qid] = { fileUrl: '#preview', fileName: hsPendingFiles[qid].name }; });
+      hsPendingFiles = {};
+      return;
+    }
     for (const qid of ids) {
       const file = hsPendingFiles[qid];
       const path = 'hostSetup/' + hsCurrentUid + '/' + qid + '-' + Date.now() + '-' + file.name;
@@ -817,6 +827,7 @@
   }
 
   async function hsSaveProgress(completed) {
+    if (hsPreviewMode) { if (completed) hsExistingCompletedAt = new Date().toISOString(); return; } // nothing written anywhere
     const payload = {
       hostSetup: {
         answers: hsAnswers,
@@ -829,12 +840,75 @@
   }
 
   function hsBackToAccount() {
+    if (hsPreviewMode) { hsShowPreviewEnd('finished'); return; }
     document.getElementById('panelHostSetup').classList.remove('active');
     if (!hsCurrentUid) { switchTab('signin'); return; }
     getDoc(doc(db, 'users', hsCurrentUid)).then(snap => {
       const profile = snap.exists() ? snap.data() : {};
       showAccountView(profile);
     }).catch(() => { switchTab('signin'); });
+  }
+
+  // ── HOST SETUP — HQ preview mode ────────────────────────────────────────
+  // Opened directly as accounts.html?hostSetupPreview=1 from the "Preview as
+  // Host" button in HQ's Host Setup Questions builder. Renders the exact same
+  // wizard a real host sees after creating an account — same markup, same
+  // CSS, same validation, same conditional-question logic — but with no sign-
+  // in required and nothing ever written to Firestore or Storage.
+  window.openHostSetupPreview = async function() {
+    hsPreviewMode = true;
+    hsPostSignupUid = null;
+    document.querySelector('.toggle-row').style.display = 'none';
+    ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue', 'panelNoAccess', 'panelAccount'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('panelHostSetup').classList.add('active');
+    document.getElementById('hsSkipLink').style.display = 'none';
+    document.getElementById('hsExitLink').style.display = '';
+    document.getElementById('hsExitLink').textContent = 'Close preview';
+    document.getElementById('hsBackBtn').style.display = 'none';
+    document.getElementById('hsNextBtn').style.display = '';
+    document.getElementById('hsNextBtn').disabled = false;
+    clearHsMsg();
+    showHsMsg('Preview mode — this is exactly what a new host sees. Nothing you enter here is saved.', 'success');
+
+    hsCurrentUid = 'preview-' + Date.now();
+    hsAnswers = {};
+    hsPendingFiles = {};
+    hsStartedAt = new Date().toISOString();
+    hsExistingCompletedAt = null;
+
+    if (!hsSchema) {
+      try {
+        const snap = await getDoc(doc(db, 'hq_data', 'hostSetupSchema'));
+        hsSchema = snap.exists() ? JSON.parse(snap.data().value) : { sections: [] };
+      } catch (e) { hsSchema = { sections: [] }; }
+    }
+    if (!hsSchema.sections || !hsSchema.sections.length) {
+      document.getElementById('hsSectionTitle').textContent = 'Nothing to preview yet';
+      document.getElementById('hsSectionDesc').textContent = '';
+      document.getElementById('hsQuestions').innerHTML = '<div style="font-size:0.82rem;color:var(--text3);">No Host Setup questions are configured in HQ yet — add a section or load the default template, then reopen this preview.</div>';
+      document.getElementById('hsNextBtn').style.display = 'none';
+      return;
+    }
+    hsSectionIndex = 0;
+    hsRenderSection();
+  };
+  function hsShowPreviewEnd(reason) {
+    document.getElementById('hsSectionTitle').textContent = reason === 'finished' ? 'Preview complete' : 'Preview closed';
+    document.getElementById('hsSectionDesc').textContent = '';
+    document.getElementById('hsQuestions').innerHTML =
+      '<div style="font-size:0.82rem;color:var(--text3);line-height:1.6;margin-bottom:1.1rem;">' +
+      (reason === 'finished'
+        ? 'That’s the full flow a new host walks through, start to finish. Nothing was saved — this was a preview.'
+        : 'Nothing was saved — this was a preview.') +
+      '</div>';
+    document.getElementById('hsProgressLabel').textContent = 'Preview';
+    document.getElementById('hsProgressFill').style.width = '100%';
+    document.getElementById('hsBackBtn').style.display = 'none';
+    document.getElementById('hsNextBtn').style.display = '';
+    document.getElementById('hsNextBtn').disabled = false;
+    document.getElementById('hsNextBtn').textContent = 'Restart Preview';
+    hsPreviewEnded = true;
+    document.getElementById('hsExitLink').style.display = '';
   }
 
   window.hsGoBack = function() {
@@ -844,6 +918,7 @@
   };
 
   window.hsGoNext = async function() {
+    if (hsPreviewMode && hsPreviewEnded) { hsPreviewEnded = false; openHostSetupPreview(); return; }
     const missing = hsValidateSection();
     if (missing) { showHsMsg('Please answer "' + missing.label + '" before continuing.', 'error'); return; }
     const isLast = hsSectionIndex === hsSchema.sections.length - 1;
@@ -874,10 +949,13 @@
   };
 
   window.hsExitToAccount = async function() {
+    if (hsPreviewMode) { hsShowPreviewEnd('exited'); return; }
     document.getElementById('hsNextBtn').disabled = true;
     try { await hsUploadPendingFiles(); await hsSaveProgress(false); } catch (e) {}
     hsBackToAccount();
   };
+
+  if (hostSetupPreview) openHostSetupPreview();
 </script>
 </body>
 </html>
