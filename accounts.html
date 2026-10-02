@@ -280,7 +280,7 @@
   // HQ (admin-gated inside itself instead, so this stays the front door everyone
   // can reach), and "shifts" (check-in/check-out), since every host needs those
   // regardless of which other apps they have access to.
-  const OPEN_TO_ANY_SIGNED_IN = ['hq', 'shifts'];
+  const OPEN_TO_ANY_SIGNED_IN = ['hq', 'shifts', 'venueMenuPublic'];
   function hasPermission(profile, appKey) {
     if (!appKey) return true;
     if (OPEN_TO_ANY_SIGNED_IN.includes(appKey)) return true;
