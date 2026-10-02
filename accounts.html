@@ -712,7 +712,13 @@
         createdAt: new Date().toISOString(),
         signedUpFrom: fromApp || null
       });
-      await mirrorProgramAccess(uid, entitlements);
+      // No RTDB mirror here on purpose: a fresh signup's entitlements are all
+      // false anyway (nothing to mirror yet), and Realtime Database's own rules
+      // only let an already-admin-listed uid write to users/{uid} there — a
+      // brand-new account writing its own doc will always be rejected. That's
+      // fine and expected; the real mirror happens later, when an admin
+      // actually grants something via HQ's Accounts tab (toggleEntitlement /
+      // toggleAdminAccess), which mirrors as the admin's own session instead.
 
       if (usernameKey) {
         await setDoc(doc(db, "loginLookup", usernameKey), { email });
