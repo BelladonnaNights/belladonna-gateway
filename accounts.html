@@ -22,6 +22,7 @@
   .sub{font-family:'EB Garamond',serif;font-style:italic;font-size:0.95rem;color:var(--text3);margin-top:0.5rem;margin-bottom:2rem;text-align:center;letter-spacing:0.01em;}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.75rem 1.5rem;}
   .toggle-row{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:999px;margin-bottom:1.5rem;padding:4px;gap:4px;}
+  .role-toggle-row{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:4px;gap:4px;margin-bottom:0;}
   .toggle-btn{flex:1;background:none;border:none;border-radius:999px;color:var(--text3);padding:0.6rem;font-family:'DM Sans',sans-serif;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;font-weight:500;}
   .toggle-btn.active{background:var(--gold-dim);color:var(--gold);border:1px solid var(--border-gold);}
   .field{margin-bottom:1rem;}
@@ -132,6 +133,13 @@
     <!-- CREATE ACCOUNT -->
     <div class="panel" id="panelSignup">
       <div class="field">
+        <label>I'm Signing Up As</label>
+        <div class="role-toggle-row">
+          <button type="button" class="toggle-btn" id="roleBtnHost" onclick="selectSignupRole('host')">Host</button>
+          <button type="button" class="toggle-btn" id="roleBtnVenue" onclick="selectSignupRole('venue')">Venue</button>
+        </div>
+      </div>
+      <div class="field">
         <label>Full Name</label>
         <input type="text" id="signupName" placeholder="Your name">
       </div>
@@ -153,7 +161,7 @@
         <input type="password" id="signupConfirm" placeholder="Repeat password" autocomplete="new-password">
       </div>
       <button class="btn" id="signupBtn" onclick="doSignUp()">Create Account</button>
-      <div class="field-hint" style="text-align:center;margin-top:1rem;">This account works across every Belladonna app. Access to each one depends on what you've subscribed to.</div>
+      <div class="field-hint" style="text-align:center;margin-top:1rem;">This account works across every Belladonna app. Access to each one depends on what you've been given.</div>
     </div>
 
     <!-- MY ACCOUNT (already signed in, arrived via ?view=account from an app's "My Account" link) -->
@@ -420,6 +428,15 @@
     } catch (e) { /* fall back to the normal sign-in form */ }
   });
 
+  // ── Signup role (Host / Venue) — required, no "Subscriber" option. Determines
+  // accountType written at signup, and whether the Host Setup wizard runs after.
+  let signupRole = null;
+  window.selectSignupRole = function(role) {
+    signupRole = role;
+    document.getElementById('roleBtnHost').classList.toggle('active', role === 'host');
+    document.getElementById('roleBtnVenue').classList.toggle('active', role === 'venue');
+  };
+
   window.switchTab = function(which) {
     clearMsg();
     document.querySelector('.toggle-row').style.display = 'flex';
@@ -568,6 +585,7 @@
     const confirm = document.getElementById("signupConfirm").value;
     const btn = document.getElementById("signupBtn");
 
+    if (!signupRole) { showMsg("Choose whether you're signing up as a Host or a Venue.", "error"); return; }
     if (!name || !email || !password) { showMsg("Name, email, and password are required.", "error"); return; }
     if (password.length < 6) { showMsg("Password must be at least 6 characters.", "error"); return; }
     if (password !== confirm) { showMsg("Passwords don't match.", "error"); return; }
@@ -590,15 +608,17 @@
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const uid = cred.user.uid;
 
-      // Default shape: a self-signed-up subscriber, no access yet.
-      // Hosts are created separately by an admin, not through this form.
-      const entitlements = { bingo: false, trivia: false, mediaPlayer: false, training: false };
+      // Every signup is either a Host or a Venue (no more generic "subscriber"
+      // signups) — Ahnna links this account to its Host Roster / Our Venues
+      // record afterward by matching hostId/venueId or gatewayEmail in HQ.
+      const entitlements = { bingo: false, trivia: false, mediaPlayer: false, training: false, venueMenu: false };
       await setDoc(doc(db, "users", uid), {
         name,
         email,
         username: username || null,
         hostId: null,
-        accountType: "subscriber",
+        venueId: null,
+        accountType: signupRole, // "host" or "venue"
         status: "active",
         banUntil: null,
         entitlements,
@@ -617,8 +637,14 @@
       }
 
       writeAppSession(uid, fromApp);
-      hsPostSignupUid = uid;
-      openHostSetup(true);
+      if (signupRole === 'host') {
+        hsPostSignupUid = uid;
+        openHostSetup(true);
+      } else {
+        // Venues don't go through the Host Setup wizard — nothing built for
+        // them yet, so just send them on to whichever app sent them here.
+        goToReturn();
+      }
     } catch (e) {
       if (e.code === "auth/email-already-in-use") {
         showMsg("That email already has an account — try signing in instead.", "error");
