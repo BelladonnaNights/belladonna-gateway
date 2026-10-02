@@ -72,6 +72,19 @@
   .hs-status-block{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.9rem 1rem;margin-bottom:1.6rem;}
   .hs-status-title{font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:0.5rem;}
   .hs-status-line{font-size:0.8rem;color:var(--text2);margin-bottom:0.7rem;}
+
+  /* Access catalog — "Your Access" list on My Account and the No Access screen */
+  .access-list{border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .access-row{display:flex;align-items:center;justify-content:space-between;gap:0.75rem;padding:0.6rem 0.8rem;font-size:0.8rem;color:var(--text2);border-bottom:1px solid var(--border);}
+  .access-row:last-child{border-bottom:none;}
+  .access-row.highlight{background:var(--gold-dim);}
+  .access-status{font-size:0.68rem;letter-spacing:0.04em;white-space:nowrap;color:var(--text3);}
+  .access-status.have{color:var(--text2);}
+  .access-status.admin{color:var(--gold);font-weight:600;}
+  .access-status.pending{color:var(--text4);font-style:italic;}
+  .access-btn{background:none;border:1px solid var(--border-gold);border-radius:999px;color:var(--gold);padding:0.32rem 0.8rem;font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;transition:all 0.2s;white-space:nowrap;}
+  .access-btn:hover{background:var(--gold-dim);}
+  .access-btn:disabled{opacity:0.5;cursor:not-allowed;background:none;}
   .hs-status-line.done{color:var(--success);}
 </style>
 </head>
@@ -182,7 +195,7 @@
       </div>
 
       <div style="font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:0.6rem;">Your Access</div>
-      <div id="acctAccessList" style="font-size:0.78rem;color:var(--text2);line-height:2;margin-bottom:1.6rem;"></div>
+      <div id="acctAccessList" style="margin-bottom:1.6rem;"></div>
       <div style="font-size:0.66rem;color:var(--text4);margin:-1.2rem 0 1.6rem;line-height:1.5;">Access is managed by Belladonna — contact them if something here needs to change.</div>
 
       <div style="font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:0.8rem;">Change Password</div>
@@ -397,21 +410,20 @@
       snap.forEach(d => { const r = d.data(); if (r.status === 'pending') pendingIds.add(r.catalogId); });
     } catch (e) { /* if this fails, requests just won't show as pending yet — not fatal */ }
 
-    el.innerHTML = APP_CATALOG.map(item => {
+    el.innerHTML = '<div class="access-list">' + APP_CATALOG.map(item => {
       const has = catalogHasAccess(profile, item);
       const isPending = pendingIds.has(item.id);
       const highlight = item.id === highlightCatalogId;
       let right;
       if (has) {
-        right = '<span style="color:' + (item.kind === 'admin' ? 'var(--gold)' : 'var(--text2)') + ';font-size:0.72rem;">' + (item.kind === 'admin' ? '✓ Admin' : '✓ Have it') + '</span>';
+        right = '<span class="access-status ' + (item.kind === 'admin' ? 'admin' : 'have') + '">' + (item.kind === 'admin' ? '✓ Admin' : '✓ Have it') + '</span>';
       } else if (isPending) {
-        right = '<span style="color:var(--text4);font-size:0.72rem;">Requested — pending</span>';
+        right = '<span class="access-status pending">Requested — pending</span>';
       } else {
-        right = '<button type="button" class="forgot-link" style="font-size:0.72rem;margin:0;" onclick="requestAccess(\'' + item.id + '\',\'' + item.key + '\',\'' + item.kind + '\',\'' + item.label.replace(/'/g, "\\'") + '\',this)">Request Access</button>';
+        right = '<button type="button" class="access-btn" onclick="requestAccess(\'' + item.id + '\',\'' + item.key + '\',\'' + item.kind + '\',\'' + item.label.replace(/'/g, "\\'") + '\',this)">Request</button>';
       }
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;' + (highlight ? 'background:rgba(201,168,76,0.08);border-radius:6px;padding-left:0.4rem;padding-right:0.4rem;' : '') + 'font-size:0.78rem;color:var(--text2);">'
-        + '<span>' + item.label + '</span>' + right + '</div>';
-    }).join('');
+      return '<div class="access-row' + (highlight ? ' highlight' : '') + '"><span>' + item.label + '</span>' + right + '</div>';
+    }).join('') + '</div>';
   }
   window.requestAccess = async function(catalogId, appKey, kind, label, btnEl) {
     const user = auth.currentUser;
@@ -433,7 +445,7 @@
       });
       if (btnEl) {
         const span = document.createElement('span');
-        span.style.color = 'var(--text4)'; span.style.fontSize = '0.72rem';
+        span.className = 'access-status pending';
         span.textContent = 'Requested — pending';
         btnEl.replaceWith(span);
       }
