@@ -124,9 +124,13 @@
       <a class="forgot-link" onclick="switchToFullLogin()">Not you? Sign in as someone else</a>
     </div>
 
-    <!-- NO ACCESS (signed in, but no entitlement for the app that sent them here) -->
+    <!-- NO ACCESS (signed in, but no entitlement for the app that sent them here) —
+         instead of a dead end, shows every app and lets them request the ones
+         they're missing, so Belladonna has something to actually act on. -->
     <div class="panel" id="panelNoAccess">
       <div style="text-align:center;padding:0.5rem 0 1.25rem;font-size:0.82rem;color:var(--text2);line-height:1.7;" id="noAccessMsg"></div>
+      <div style="font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3);margin-bottom:0.6rem;">Your Access</div>
+      <div id="noAccessCatalog" style="margin-bottom:1.4rem;"></div>
       <a class="forgot-link" onclick="switchToFullLogin()">Sign in as someone else</a>
     </div>
 
@@ -229,7 +233,7 @@
     updatePassword, reauthenticateWithCredential, EmailAuthProvider
   } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, setDoc
+    getFirestore, doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import {
     getDatabase, ref, set as rtdbSet
@@ -339,11 +343,13 @@
     document.getElementById('panelContinue').classList.add('active');
     document.querySelector('.toggle-row').style.display = 'none';
   };
-  window.showNoAccess = function(name, appKey) {
-    document.getElementById('noAccessMsg').textContent = (name ? name + ", your" : "Your") + " account doesn't have access to " + (appKey || "this app") + " yet. Contact Belladonna if you think this is a mistake.";
+  window.showNoAccess = function(name, appKey, profile, uid) {
+    document.getElementById('noAccessMsg').textContent = (name ? name + ", your" : "Your") + " account doesn't have access to " + (appKey || "this app") + " yet — but you can request it below, or any of the others.";
     ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue', 'panelAccount', 'panelHostSetup'].forEach(id => document.getElementById(id).classList.remove('active'));
     document.getElementById('panelNoAccess').classList.add('active');
     document.querySelector('.toggle-row').style.display = 'none';
+    const highlightItem = APP_CATALOG.find(i => i.key === appKey && i.kind === (ADMIN_GATED_APPS.includes(appKey) ? 'admin' : 'entitlement'));
+    renderAccessCatalog('noAccessCatalog', profile || {}, uid || (auth.currentUser && auth.currentUser.uid), highlightItem && highlightItem.id);
   };
   window.switchToFullLogin = async function() {
     await signOut(auth);
@@ -356,24 +362,96 @@
     goToReturn();
   };
 
+  // ── Access catalog — every app a Belladonna account could have, shown with
+  // its current status and (if missing) a "Request Access" button. Used in two
+  // places: the "My Account" panel (full picture, reachable any time) and the
+  // "No Access" panel (shown right when a specific app's front door turns them
+  // away) — so neither one is ever a dead end. A request writes a doc to
+  // `accessRequests` for Belladonna to review in HQ; it grants nothing by
+  // itself, the actual entitlement/adminAccess toggle still only happens when
+  // she flips it in HQ's Accounts tab.
+  const APP_CATALOG = [
+    { id: 'ent:bingo', key: 'bingo', label: 'Bingo', kind: 'entitlement' },
+    { id: 'ent:trivia', key: 'trivia', label: 'Trivia', kind: 'entitlement' },
+    { id: 'ent:mediaPlayer', key: 'mediaPlayer', label: 'Media Player', kind: 'entitlement' },
+    { id: 'ent:training', key: 'training', label: 'Training', kind: 'entitlement' },
+    { id: 'ent:venueMenu', key: 'venueMenu', label: 'Venue Menu', kind: 'entitlement' },
+    { id: 'admin:hq', key: 'hq', label: 'HQ', kind: 'admin' },
+    { id: 'admin:venueMenu', key: 'venueMenu', label: 'Venue Menu — Admin Builder', kind: 'admin' },
+    { id: 'admin:trivia', key: 'trivia', label: 'Trivia — Admin', kind: 'admin' },
+    { id: 'admin:bingo', key: 'bingo', label: 'Bingo — Admin', kind: 'admin' },
+    { id: 'admin:mediaPlayer', key: 'mediaPlayer', label: 'Media Player — Admin', kind: 'admin' },
+    { id: 'admin:training', key: 'training', label: 'Training — Admin', kind: 'admin' }
+  ];
+  function catalogHasAccess(profile, item) {
+    if (item.kind === 'admin') return !!(profile.adminAccess && profile.adminAccess[item.key]);
+    return !!(profile.entitlements && profile.entitlements[item.key]);
+  }
+  async function renderAccessCatalog(containerId, profile, uid, highlightCatalogId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = '<div style="color:var(--text4);font-size:0.78rem;">Loading…</div>';
+    let pendingIds = new Set();
+    try {
+      const snap = await getDocs(query(collection(db, 'accessRequests'), where('uid', '==', uid)));
+      snap.forEach(d => { const r = d.data(); if (r.status === 'pending') pendingIds.add(r.catalogId); });
+    } catch (e) { /* if this fails, requests just won't show as pending yet — not fatal */ }
+
+    el.innerHTML = APP_CATALOG.map(item => {
+      const has = catalogHasAccess(profile, item);
+      const isPending = pendingIds.has(item.id);
+      const highlight = item.id === highlightCatalogId;
+      let right;
+      if (has) {
+        right = '<span style="color:' + (item.kind === 'admin' ? 'var(--gold)' : 'var(--text2)') + ';font-size:0.72rem;">' + (item.kind === 'admin' ? '✓ Admin' : '✓ Have it') + '</span>';
+      } else if (isPending) {
+        right = '<span style="color:var(--text4);font-size:0.72rem;">Requested — pending</span>';
+      } else {
+        right = '<button type="button" class="forgot-link" style="font-size:0.72rem;margin:0;" onclick="requestAccess(\'' + item.id + '\',\'' + item.key + '\',\'' + item.kind + '\',\'' + item.label.replace(/'/g, "\\'") + '\',this)">Request Access</button>';
+      }
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;' + (highlight ? 'background:rgba(201,168,76,0.08);border-radius:6px;padding-left:0.4rem;padding-right:0.4rem;' : '') + 'font-size:0.78rem;color:var(--text2);">'
+        + '<span>' + item.label + '</span>' + right + '</div>';
+    }).join('');
+  }
+  window.requestAccess = async function(catalogId, appKey, kind, label, btnEl) {
+    const user = auth.currentUser;
+    if (!user) return;
+    if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Requesting…'; }
+    try {
+      let requesterName = user.email || '', requesterEmail = user.email || '';
+      try {
+        const pSnap = await getDoc(doc(db, 'users', user.uid));
+        if (pSnap.exists()) { requesterName = pSnap.data().name || requesterName; requesterEmail = pSnap.data().email || requesterEmail; }
+      } catch (e) {}
+      await addDoc(collection(db, 'accessRequests'), {
+        uid: user.uid,
+        name: requesterName,
+        email: requesterEmail,
+        catalogId, appKey, kind, label,
+        status: 'pending',
+        requestedAt: serverTimestamp()
+      });
+      if (btnEl) {
+        const span = document.createElement('span');
+        span.style.color = 'var(--text4)'; span.style.fontSize = '0.72rem';
+        span.textContent = 'Requested — pending';
+        btnEl.replaceWith(span);
+      }
+    } catch (e) {
+      if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Request Access'; }
+      console.error('Could not submit access request:', e);
+    }
+  };
+
   // ── My Account — arrived via ?view=account from an already-signed-in app,
-  // not a login redirect. Shows their access (read-only) and lets them change
-  // their own password. ──────────────────────────────────────────────────
-  const ACCESS_LABELS = { bingo: 'Bingo', trivia: 'Trivia', mediaPlayer: 'Media Player', training: 'Training' };
-  async function showAccountView(profile) {
+  // not a login redirect. Shows their full access picture and lets them
+  // change their own password. ──────────────────────────────────────────────
+  async function showAccountView(profile, uid) {
     document.querySelector('.toggle-row').style.display = 'none';
     ['panelSignin', 'panelSignup', 'panelForgot', 'panelContinue', 'panelNoAccess', 'panelHostSetup'].forEach(id => document.getElementById(id).classList.remove('active'));
     document.getElementById('acctName').textContent = profile.name || 'Account';
     document.getElementById('acctEmail').textContent = profile.email || auth.currentUser.email || '';
-    const have = Object.keys(ACCESS_LABELS).filter(k => profile.entitlements && profile.entitlements[k]);
-    const adminOf = Object.keys(profile.adminAccess || {}).filter(k => profile.adminAccess[k]);
-    const listEl = document.getElementById('acctAccessList');
-    if (!have.length && !adminOf.length) {
-      listEl.innerHTML = '<div style="color:var(--text4);">No app access yet — contact Belladonna to get set up.</div>';
-    } else {
-      listEl.innerHTML = have.map(k => '<div>' + ACCESS_LABELS[k] + '</div>').join('')
-        + adminOf.map(k => '<div style="color:var(--gold);">' + (ACCESS_LABELS[k] || k) + ' — Admin</div>').join('');
-    }
+    renderAccessCatalog('acctAccessList', profile, uid || auth.currentUser.uid);
     document.getElementById('panelAccount').classList.add('active');
     if (!hsSchema) {
       try {
@@ -423,7 +501,7 @@
         const profileSnap = await getDoc(doc(db, "users", user.uid));
         const profile = profileSnap.exists() ? profileSnap.data() : {};
         if (checkBan(profile)) { await signOut(auth); return; }
-        showAccountView(profile);
+        showAccountView(profile, user.uid);
       } catch (e) { /* fall back to the normal sign-in form */ }
       return;
     }
@@ -433,7 +511,7 @@
       const profile = profileSnap.exists() ? profileSnap.data() : {};
       if (checkBan(profile)) { await signOut(auth); return; }
       if (hasPermission(profile, fromApp)) showContinueAs(profile.name || user.email, user.uid);
-      else showNoAccess(profile.name, fromApp);
+      else showNoAccess(profile.name, fromApp, profile, user.uid);
     } catch (e) { /* fall back to the normal sign-in form */ }
   });
 
@@ -532,7 +610,7 @@
       }
 
       if (fromApp && !hasPermission(profile, fromApp)) {
-        showNoAccess(profile.name, fromApp);
+        showNoAccess(profile.name, fromApp, profile, cred.user.uid);
         btn.disabled = false; btn.textContent = "Sign In";
         return;
       }
@@ -641,7 +719,7 @@
       }
 
       if (fromApp && !hasPermission({ entitlements, adminAccess: {} }, fromApp)) {
-        showNoAccess(name, fromApp);
+        showNoAccess(name, fromApp, { entitlements, adminAccess: {} }, uid);
         return;
       }
 
