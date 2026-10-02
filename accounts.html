@@ -277,12 +277,17 @@
   const hostSetupPreview = params.get("hostSetupPreview") === "1"; // opened from HQ's "Preview as Host" button — no sign-in needed, nothing saved
 
   // Apps that any signed-in account can use, with no specific entitlement check —
-  // HQ (admin-gated inside itself instead, so this stays the front door everyone
-  // can reach), and "shifts" (check-in/check-out), since every host needs those
-  // regardless of which other apps they have access to.
-  const OPEN_TO_ANY_SIGNED_IN = ['hq', 'shifts', 'venueMenuPublic'];
+  // "shifts" (check-in/check-out), since every host needs it regardless of which
+  // other apps they have access to.
+  const OPEN_TO_ANY_SIGNED_IN = ['shifts', 'venueMenuPublic'];
+  // Internal admin tools whose front door requires actual ADMIN access
+  // (profile.adminAccess[key]) rather than a regular entitlement or open signed-in
+  // access — getting past this gate means full access to that tool, so it must
+  // never fall back to "any signed-in account." HQ belongs here, not above.
+  const ADMIN_GATED_APPS = ['hq'];
   function hasPermission(profile, appKey) {
     if (!appKey) return true;
+    if (ADMIN_GATED_APPS.includes(appKey)) return !!(profile.adminAccess && profile.adminAccess[appKey]);
     if (OPEN_TO_ANY_SIGNED_IN.includes(appKey)) return true;
     return !!(profile.entitlements && profile.entitlements[appKey]);
   }
