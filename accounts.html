@@ -283,8 +283,12 @@
   // Internal admin tools whose front door requires actual ADMIN access
   // (profile.adminAccess[key]) rather than a regular entitlement or open signed-in
   // access — getting past this gate means full access to that tool, so it must
-  // never fall back to "any signed-in account." HQ belongs here, not above.
-  const ADMIN_GATED_APPS = ['hq'];
+  // never fall back to "any signed-in account." HQ and the Venue Menu admin
+  // builder (venue-menu-index.html, appKey "venueMenu") belong here, not above —
+  // venueMenu also exists as a plain "Can Use" entitlement for the separate,
+  // public venue.html app, so without this, toggling that entitlement by mistake
+  // would also hand someone the admin builder tool.
+  const ADMIN_GATED_APPS = ['hq', 'venueMenu'];
   function hasPermission(profile, appKey) {
     if (!appKey) return true;
     if (ADMIN_GATED_APPS.includes(appKey)) return !!(profile.adminAccess && profile.adminAccess[appKey]);
