@@ -112,6 +112,10 @@
         <label>Password</label>
         <input type="password" id="signinPassword" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();doSignIn();}">
       </div>
+      <div id="stuckFix" style="display:none;margin:0 0 12px;padding:12px 14px;border:1px solid rgba(201,169,110,.5);border-radius:10px;font-size:.82rem;line-height:1.5;text-align:center">
+        <div id="stuckFixText" style="margin-bottom:10px"></div>
+        <button class="btn" type="button" onclick="resetBrowser()" style="width:100%">Fix this browser now</button>
+      </div>
       <button class="btn" id="signinBtn" onclick="doSignIn()">Sign In</button>
       <a class="forgot-link" onclick="showForgot()">Forgot password?</a>
       <a class="forgot-link" onclick="doTroubleReset()">Trouble signing in? Reset this browser</a>
@@ -506,6 +510,10 @@
     btn.disabled = false; btn.textContent = 'Update Password';
   };
 
+  // ?reset=1 (a bookmark hosts can use): clears this browser's stuck sign-in data automatically.
+  if (params.get('reset') === '1') { doTroubleReset(true); }
+  else { storageHealthCheck(); }
+
   onAuthStateChanged(auth, async (user) => {
     if (!user) return;
     if (view === 'account') {
@@ -569,9 +577,43 @@
   }
 
   // ── Sign in ──────────────────────────────────────────────────────────────
-  window.doTroubleReset = async function() {
-    if (!confirm("This clears saved sign-in data for this site in this browser and reloads the page — you'll need to sign in again after. Continue?")) return;
-    try { await signOut(auth); } catch (e) { /* ignore — may already be signed out */ }
+  // Never leave anyone staring at a frozen "Signing in…": every step that talks
+  // to the browser's storage or the network has a time limit, and a stuck
+  // browser gets a one-tap fix instead of an endless spinner.
+  function withTimeout(promise, ms) {
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => { const e = new Error('timeout'); e.code = 'bn/timeout'; reject(e); }, ms);
+      Promise.resolve(promise).then(v => { clearTimeout(t); resolve(v); }, er => { clearTimeout(t); reject(er); });
+    });
+  }
+  function showStuckFix(text) {
+    const box = document.getElementById('stuckFix'); if (!box) return;
+    document.getElementById('stuckFixText').textContent = text;
+    box.style.display = 'block';
+  }
+  // Checks on page load whether this browser's storage for the site is healthy:
+  // can it write (not full / not blocked), and does IndexedDB (where Firebase keeps
+  // the sign-in) actually open. A bad answer shows the fix button right away.
+  async function storageHealthCheck() {
+    let problem = null;
+    try { localStorage.setItem('bn_health', '1'); localStorage.removeItem('bn_health'); }
+    catch (e) { problem = "This browser's saved-data space for Belladonna is full or blocked."; }
+    if (!problem) {
+      try {
+        await withTimeout(new Promise((res, rej) => {
+          const r = indexedDB.open('firebaseLocalStorageDb');
+          r.onsuccess = () => { try { r.result.close(); } catch (e) {} res(); };
+          r.onerror = () => rej(r.error || new Error('idb error'));
+          r.onblocked = () => rej(new Error('idb blocked'));
+        }), 4000);
+      } catch (e) { problem = "This browser's sign-in storage is stuck."; }
+    }
+    if (problem) showStuckFix(problem + " Tap the button below — it clears it and you can sign in again (takes a few seconds).");
+  }
+  window.resetBrowser = async function() { return doTroubleReset(true); };
+  window.doTroubleReset = async function(silent) {
+    if (silent !== true && !confirm("This clears saved sign-in data for this site in this browser and reloads the page — you'll need to sign in again after. Continue?")) return;
+    try { await withTimeout(signOut(auth), 3000); } catch (e) { /* ignore — may already be signed out, or stuck */ }
     try { localStorage.clear(); } catch (e) {}
     try { sessionStorage.clear(); } catch (e) {}
     try {
@@ -580,6 +622,7 @@
         await Promise.all(dbs.map(d => new Promise(res => {
           const req = indexedDB.deleteDatabase(d.name);
           req.onsuccess = req.onerror = req.onblocked = () => res();
+          setTimeout(res, 3000);
         })));
       } else {
         // Safari (older versions) doesn't support indexedDB.databases() to enumerate —
@@ -589,7 +632,7 @@
         });
       }
     } catch (e) { console.warn('IndexedDB clear incomplete:', e); }
-    window.location.reload();
+    const u = new URL(window.location.href); u.searchParams.delete('reset'); window.location.replace(u.href);
   };
 
   window.doSignIn = async function() {
@@ -602,13 +645,13 @@
 
     btn.disabled = true; btn.textContent = "Signing in…";
     try {
-      const email = await resolveToEmail(identifier);
+      const email = await withTimeout(resolveToEmail(identifier), 20000);
       if (!email) { showMsg("We couldn't find an account matching that.", "error"); btn.disabled = false; btn.textContent = "Sign In"; return; }
 
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const cred = await withTimeout(signInWithEmailAndPassword(auth, email, password), 25000);
 
       // Check ban status before letting them proceed anywhere
-      const profileSnap = await getDoc(doc(db, "users", cred.user.uid));
+      const profileSnap = await withTimeout(getDoc(doc(db, "users", cred.user.uid)), 20000);
       const profile = profileSnap.exists() ? profileSnap.data() : {};
       const now = Date.now();
       const banUntilMs = profile.banUntil ? profile.banUntil.toMillis?.() ?? profile.banUntil : null;
@@ -632,7 +675,12 @@
       setTimeout(() => { goToReturn(); }, 700);
     } catch (e) {
       console.error('Sign-in failed:', e.code, e.message);
-      showMsg(signInErrorMessage(e), "error");
+      if (e.code === 'bn/timeout') {
+        showMsg("Sign-in is taking too long — this browser looks stuck.", "error");
+        showStuckFix("This browser's saved sign-in data is stuck. Tap the button below to clear it, then sign in again.");
+      } else {
+        showMsg(signInErrorMessage(e), "error");
+      }
       btn.disabled = false; btn.textContent = "Sign In";
     }
   };
