@@ -1107,7 +1107,10 @@
       await hsUploadPendingFiles();
       await hsSaveProgress(isLast);
     } catch (e) {
-      showHsMsg('Could not save — check your connection and try again.', 'error');
+      console.error('Host setup save failed', e);
+      var why = (e && e.code) ? String(e.code) : '';
+      var hint = /unauthorized|permission/i.test(why + ' ' + (e && e.message || '')) ? ' (permission problem — tell Bella: ' + why + ')' : (why ? ' (' + why + ')' : '');
+      showHsMsg('Could not save — check your connection and try again.' + hint, 'error');
       document.getElementById('hsNextBtn').disabled = false;
       document.getElementById('hsNextBtn').textContent = isLast ? 'Finish' : 'Next';
       return;
